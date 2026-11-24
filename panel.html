@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Güneş Paneli Karşılaştırma Paneli</title>
+<style>
+/* Hocanın panel sayfası: üstte proje başlığı ve canlı durum, büyük kazanç, iki grafik, ortam ve son kayıtlar tablosu. */
+:root {
+  --bg: #F4F3EE; --surface: #FFFFFF; --fg: #14213D; --muted: #5B6678; --line: #E1DFD6;
+  --fixed: #2F6FAE; --track: #C27A00; --good: #1E7A4F; --bad: #C43D3D; --accent: #E89A1C;
+  --font: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0B1220; --surface: #141E33; --fg: #E8EEF7; --muted: #8F9CB3; --line: #24324D;
+    --fixed: #5AA9E6; --track: #F5A524; --good: #3ECF8E; --bad: #FF6B6B; --accent: #F2B045; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.45;
+  padding: 24px max(16px, env(safe-area-inset-right)) 40px max(16px, env(safe-area-inset-left)); }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 18px; }
+header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; }
+header .eb { font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+header h1 { margin: 2px 0 4px; font-size: 1.9rem; line-height: 1.15; }
+header p { margin: 0; color: var(--muted); max-width: 60ch; }
+.live { display: inline-flex; align-items: center; gap: 8px; font-size: .85rem; font-weight: 600; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; }
+.live i { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.live.ok { color: var(--good); } .live.ok i { background: var(--good); box-shadow: 0 0 0 4px rgba(62,207,142,.18); }
+.live.bad { color: var(--bad); } .live.bad i { background: var(--bad); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px; min-width: 0; }
+.card h2 { margin: 0 0 12px; font-size: .78rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.card h2 small { font-weight: 500; letter-spacing: 0; text-transform: none; }
+.top { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 18px; }
+@media (max-width: 860px) { .top { grid-template-columns: 1fr; } }
+.gain .v { font-size: 3.4rem; font-weight: 800; line-height: 1; color: var(--good); font-variant-numeric: tabular-nums; }
+.gain p { margin: 10px 0 0; color: var(--muted); }
+.gain p b { color: var(--fg); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.m .l { font-size: .75rem; color: var(--muted); }
+.m .v { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.m.fixed .v { color: var(--fixed); } .m.track .v { color: var(--track); }
+.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 860px) { .charts { grid-template-columns: 1fr; } }
+.cb { position: relative; height: 240px; }
+.cb canvas { width: 100%; height: 100%; display: block; }
+.legend { display: flex; gap: 14px; font-size: .8rem; color: var(--muted); margin-top: 8px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: currentColor; }
+.env { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.tbl { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .85rem; font-variant-numeric: tabular-nums; }
+th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--muted); font-weight: 600; }
+.setup { display: grid; gap: 10px; max-width: 520px; }
+.setup input { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+.setup button { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 10px 16px; background: var(--accent); color: #14213D; cursor: pointer; justify-self: start; }
+.err { color: var(--bad); }
+footer { color: var(--muted); font-size: .8rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eb">Bitirme projesi · canlı veri</div>
+      <h1>Sabit ve güneş takipli panel karşılaştırması</h1>
+      <p>Veriler CrowPanel ekrandan Bluetooth ile telefona, oradan ThingSpeak'e gönderiliyor. Bu sayfa 20 saniyede bir kendini yeniler.</p>
+    </div>
+    <span class="live" id="live"><i></i><span id="liveT">Yükleniyor…</span></span>
+  </header>
+
+  <div class="card setup" id="setup" hidden>
+    <h2>Kanal seç</h2>
+    <p style="margin:0;color:var(--muted)">ThingSpeak kanal numarasını gir. Kanal herkese açık değilse okuma anahtarını (Read API Key) da gir.</p>
+    <input id="iKanal" inputmode="numeric" placeholder="Kanal numarası">
+    <input id="iOku" placeholder="Read API Key (isteğe bağlı)" autocomplete="off" spellcheck="false">
+    <button id="iTamam">Paneli aç</button>
+    <p class="err" id="err" hidden></p>
+  </div>
+
+  <div id="main" class="wrap" hidden>
+    <div class="top">
+      <div class="card gain">
+        <h2>Enerji kazancı <small id="gSaat"></small></h2>
+        <div class="v" id="gV">–</div>
+        <p id="gT">Veri bekleniyor.</p>
+      </div>
+      <div class="card">
+        <h2>Anlık güç</h2>
+        <div class="pair">
+          <div class="m fixed"><div class="l">Sabit panel</div><div class="v" id="mPS">–</div></div>
+          <div class="m track"><div class="l">Takip paneli</div><div class="v" id="mPT">–</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Günlük enerji</h2>
+        <div class="pair">
+          <div class="m fixed"><div class="l">Sabit panel</div><div class="v" id="mES">–</div></div>
+          <div class="m track"><div class="l">Takip paneli</div><div class="v" id="mET">–</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="charts">
+      <div class="card">
+        <h2>Güç (W) <small>son kayıtlar</small></h2>
+        <div class="cb"><canvas id="cP"></canvas></div>
+        <div class="legend"><span style="color:var(--fixed)">Sabit</span><span style="color:var(--track)">Takip</span></div>
+      </div>
+      <div class="card">
+        <h2>Biriken enerji (Wh)</h2>
+        <div class="cb"><canvas id="cE"></canvas></div>
+        <div class="legend"><span style="color:var(--fixed)">Sabit</span><span style="color:var(--track)">Takip</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Ortam</h2>
+      <div class="env">
+        <div class="m"><div class="l">Hava sıcaklığı</div><div class="v" id="mTa">–</div></div>
+        <div class="m"><div class="l">Bağıl nem</div><div class="v" id="mH">–</div></div>
+        <div class="m"><div class="l">UV indeksi</div><div class="v" id="mUV">–</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Son kayıtlar <small id="adet"></small></h2>
+      <div class="tbl"><table>
+        <thead><tr><th>Zaman</th><th>Sabit W</th><th>Takip W</th><th>Sabit Wh</th><th>Takip Wh</th><th>Hava °C</th><th>Nem %</th><th>UV</th><th>Kazanç</th></tr></thead>
+        <tbody id="tb"></tbody>
+      </table></div>
+    </div>
+    <footer id="foot"></footer>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const tr = (v, d) => (v == null || isNaN(v)) ? '–' : Number(v).toFixed(d).replace('.', ',');
+  const prm = new URLSearchParams(location.search);
+  let kanal = prm.get('kanal') || '', oku = prm.get('anahtar') || '';
+
+  function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+  if (!/^\d+$/.test(kanal)) { $('setup').hidden = false; $('live').hidden = true; }
+  else baslat();
+
+  $('iTamam').onclick = () => {
+    const k = $('iKanal').value.trim();
+    if (!/^\d+$/.test(k)) { $('err').hidden = false; $('err').textContent = 'Kanal numarası yalnızca rakamlardan oluşmalı.'; return; }
+    const q = new URLSearchParams({ kanal: k }); const o = $('iOku').value.trim(); if (o) q.set('anahtar', o);
+    location.search = q.toString();
+  };
+
+  function baslat() { $('main').hidden = false; yukle(); setInterval(yukle, 20000); window.addEventListener('resize', () => son && ciz(son)); }
+
+  let son = null;
+  async function yukle() {
+    const url = 'https://api.thingspeak.com/channels/' + kanal + '/feeds.json?results=400' + (oku ? '&api_key=' + encodeURIComponent(oku) : '');
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if (j === -1 || !j.feeds) throw new Error('Kanal okunamadı');
+      son = j; ciz(j);
+    } catch (e) {
+      $('live').className = 'live bad';
+      $('liveT').textContent = 'Kanal okunamadı';
+      $('foot').textContent = 'Kanal herkese açık değilse ThingSpeak → Sharing → "Share channel view with everyone" seçeneğini aç ya da linke Read API Key ekle. (' + e.message + ')';
+    }
+  }
+
+  function ciz(j) {
+    const f = j.feeds.map(x => ({ t: new Date(x.created_at), v: [1, 2, 3, 4, 5, 6, 7, 8].map(i => x['field' + i] == null ? NaN : parseFloat(x['field' + i])) }))
+      .filter(x => !isNaN(x.v[0]));
+    $('foot').textContent = (j.channel && j.channel.name ? j.channel.name + ' · ' : '') + 'Kanal ' + kanal + ' · ThingSpeak';
+    if (!f.length) { $('live').className = 'live'; $('liveT').textContent = 'Henüz veri yok'; return; }
+    const s = f[f.length - 1], v = s.v;
+    const yas = (Date.now() - s.t.getTime()) / 1000;
+    $('live').className = 'live ' + (yas < 90 ? 'ok' : '');
+    $('liveT').textContent = yas < 90 ? 'Canlı · ' + Math.round(yas) + ' sn önce' : 'Son veri ' + s.t.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+    const kz = v[7];
+    $('gV').textContent = (kz >= 0 ? '+%' : '−%') + tr(Math.abs(kz), 1);
+    $('gV').style.color = kz >= 0 ? css('--good') : css('--bad');
+    $('gT').innerHTML = v[2] > 0.05 ? 'Takip paneli bugün sabit panele göre <b>' + tr(Math.abs(kz), 1) + '% ' + (kz >= 0 ? 'daha fazla' : 'daha az') + '</b> enerji üretti.' : 'Gün yeni başladı; karşılaştırma için enerji birikmesi bekleniyor.';
+    $('gSaat').textContent = s.t.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    $('mPS').textContent = tr(v[0], 1) + ' W'; $('mPT').textContent = tr(v[1], 1) + ' W';
+    $('mES').textContent = tr(v[2], 1) + ' Wh'; $('mET').textContent = tr(v[3], 1) + ' Wh';
+    $('mTa').textContent = tr(v[4], 1) + ' °C'; $('mH').textContent = '%' + tr(v[5], 0); $('mUV').textContent = tr(v[6], 1);
+
+    grafik($('cP'), f, [0, 1], 'W');
+    grafik($('cE'), f, [2, 3], 'Wh');
+
+    $('adet').textContent = f.length + ' kayıt';
+    const tb = $('tb'); tb.innerHTML = '';
+    f.slice(-15).reverse().forEach(x => {
+      const row = document.createElement('tr');
+      [x.t.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+       tr(x.v[0], 2), tr(x.v[1], 2), tr(x.v[2], 1), tr(x.v[3], 1), tr(x.v[4], 1), tr(x.v[5], 0), tr(x.v[6], 1), (x.v[7] >= 0 ? '+' : '−') + tr(Math.abs(x.v[7]), 1) + '%']
+        .forEach((t, i) => { const td = document.createElement('td'); td.textContent = t; if (i === 1 || i === 3) td.style.color = css('--fixed'); if (i === 2 || i === 4) td.style.color = css('--track'); row.appendChild(td); });
+      tb.appendChild(row);
+    });
+  }
+
+  function grafik(c, f, idx, birim) {
+    const r = c.getBoundingClientRect(); if (!r.width) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    c.width = r.width * dpr; c.height = r.height * dpr;
+    const x = c.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const W = r.width, H = r.height, L = 40, R = 10, T = 10, B = 24;
+    x.clearRect(0, 0, W, H);
+    let mx = 0; f.forEach(p => idx.forEach(i => { if (!isNaN(p.v[i])) mx = Math.max(mx, p.v[i]); }));
+    const adim = mx <= 25 ? 5 : mx <= 60 ? 10 : mx <= 150 ? 25 : 50;
+    mx = Math.max(adim, Math.ceil(mx / adim) * adim);
+    const Y = v => T + (H - T - B) * (1 - v / mx);
+    const t0 = f[0].t.getTime(), t1 = f[f.length - 1].t.getTime(), sp = Math.max(1, t1 - t0);
+    const X = t => L + (W - L - R) * (t - t0) / sp;
+    x.font = '11px ' + css('--font'); x.fillStyle = css('--muted'); x.strokeStyle = css('--line'); x.lineWidth = 1;
+    x.textAlign = 'right'; x.textBaseline = 'middle';
+    for (let v = 0; v <= mx + 1e-9; v += adim) { x.beginPath(); x.moveTo(L, Y(v)); x.lineTo(W - R, Y(v)); x.stroke(); x.fillText(String(v), L - 6, Y(v)); }
+    x.textBaseline = 'alphabetic';
+    const fmt = d => d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    x.textAlign = 'left'; x.fillText(fmt(f[0].t), L, H - 6);
+    x.textAlign = 'right'; x.fillText(fmt(f[f.length - 1].t), W - R, H - 6);
+    const renk = [css('--fixed'), css('--track')];
+    idx.forEach((i, k) => {
+      x.beginPath(); let on = false;
+      f.forEach((p, n) => {
+        if (isNaN(p.v[i])) { on = false; return; }
+        // 10 dakikadan uzun boşlukta çizgiyi kes
+        if (on && n > 0 && p.t - f[n - 1].t > 600000) on = false;
+        on ? x.lineTo(X(p.t.getTime()), Y(p.v[i])) : x.moveTo(X(p.t.getTime()), Y(p.v[i])); on = true;
+      });
+      x.strokeStyle = renk[k]; x.lineWidth = 2.2; x.lineJoin = 'round'; x.stroke();
+      const s = f[f.length - 1]; if (!isNaN(s.v[i])) { x.beginPath(); x.arc(X(t1), Y(s.v[i]), 3.5, 0, 7); x.fillStyle = renk[k]; x.fill(); }
+    });
+  }
+})();
+</script>
+</body>
+</html>
