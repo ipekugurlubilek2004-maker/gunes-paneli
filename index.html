@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1A2B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Güneş Paneli Köprüsü</title>
+<style>
+/* Tek sütun, telefon için. Üstte bağlantı, ortada canlı değerler, altta internet ve kayıt. */
+:root {
+  --bg: #F3F2EC;
+  --surface: #FFFFFF;
+  --fg: #14213D;
+  --muted: #5B6678;
+  --line: #DEDCD2;
+  --fixed: #2F6FAE;
+  --track: #B86F00;
+  --good: #1E7A4F;
+  --bad: #C43D3D;
+  --accent: #E89A1C;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  --mono: ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0E1A2B; --surface: #17283F; --fg: #EEF1F5; --muted: #A9B7C8; --line: #26384F;
+    --fixed: #5AA9E6; --track: #F5A524; --good: #3ECF8E; --bad: #FF6B6B; --accent: #F2B045;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 16px; line-height: 1.45;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.wrap { max-width: 520px; margin: 0 auto; display: grid; gap: 16px; }
+header h1 { font-size: 1.5rem; margin: 4px 0 2px; }
+header p { margin: 0; color: var(--muted); font-size: .92rem; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: grid; gap: 12px; }
+.card h2 { font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+button {
+  font: inherit; font-weight: 600; border: 0; border-radius: 12px; padding: 12px 16px; cursor: pointer;
+  background: var(--accent); color: #14213D; min-height: 46px;
+}
+button.secondary { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.pill { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: .95rem; }
+.pill .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+.pill.ok .dot { background: var(--good); } .pill.ok { color: var(--good); }
+.pill.bad .dot { background: var(--bad); } .pill.bad { color: var(--bad); }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.val { background: var(--bg); border-radius: 12px; padding: 10px 12px; }
+.val .l { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.val .v { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.val.fixed .v { color: var(--fixed); } .val.track .v { color: var(--track); }
+.val.big { grid-column: 1 / -1; text-align: center; }
+.val.big .v { font-size: 2.4rem; color: var(--good); }
+label { font-size: .85rem; color: var(--muted); display: grid; gap: 6px; }
+input[type=text] {
+  font: inherit; font-family: var(--mono); font-size: .95rem; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--fg); width: 100%;
+}
+.switch { display: flex; align-items: center; gap: 10px; font-size: .95rem; color: var(--fg); }
+.switch input { width: 22px; height: 22px; accent-color: var(--accent); }
+.note { font-size: .85rem; color: var(--muted); margin: 0; }
+.warn { background: var(--bad); color: #fff; border-radius: 12px; padding: 12px 14px; font-size: .92rem; }
+.warn b { display: block; margin-bottom: 4px; }
+ol.log { margin: 0; padding-left: 18px; font-family: var(--mono); font-size: .78rem; color: var(--muted); max-height: 180px; overflow: auto; }
+a { color: var(--fixed); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Güneş Paneli Köprüsü</h1>
+    <p>CrowPanel ekrandan Bluetooth ile gelen verileri alır ve internete (ThingSpeak) gönderir.</p>
+  </header>
+
+  <div class="warn" id="uyari" hidden>
+    <b>Bu tarayıcı Bluetooth desteklemiyor.</b>
+    iPhone'da sayfayı App Store'daki ücretsiz <b>Bluefy</b> tarayıcısında aç. Android'de Chrome kullan.
+  </div>
+
+  <section class="card">
+    <h2>1 · Karta bağlan</h2>
+    <div class="row">
+      <span class="pill" id="btDurum"><span class="dot"></span><span id="btYazi">Bağlı değil</span></span>
+    </div>
+    <div class="row">
+      <button id="baglan">Karta bağlan</button>
+      <button id="kes" class="secondary" disabled>Bağlantıyı kes</button>
+    </div>
+    <p class="note">Listede <b>GunesPaneli</b> adlı cihazı seç. Kart her 20 saniyede bir veri gönderir.</p>
+  </section>
+
+  <section class="card">
+    <h2>2 · Canlı değerler</h2>
+    <div class="grid">
+      <div class="val big"><div class="l">Enerji kazancı</div><div class="v" id="vKazanc">–</div></div>
+      <div class="val fixed"><div class="l">Sabit · güç</div><div class="v" id="vPS">–</div></div>
+      <div class="val track"><div class="l">Takip · güç</div><div class="v" id="vPT">–</div></div>
+      <div class="val fixed"><div class="l">Sabit · enerji</div><div class="v" id="vES">–</div></div>
+      <div class="val track"><div class="l">Takip · enerji</div><div class="v" id="vET">–</div></div>
+      <div class="val"><div class="l">Hava</div><div class="v" id="vTa">–</div></div>
+      <div class="val"><div class="l">Nem</div><div class="v" id="vH">–</div></div>
+      <div class="val"><div class="l">UV indeksi</div><div class="v" id="vUV">–</div></div>
+      <div class="val"><div class="l">Son veri</div><div class="v" id="vSon">–</div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>3 · İnternete gönder (ThingSpeak)</h2>
+    <label for="anahtar">Write API Key
+      <input type="text" id="anahtar" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ör. ABCD1234EFGH5678">
+    </label>
+    <label for="kanal">Kanal numarası (grafik linki için, isteğe bağlı)
+      <input type="text" id="kanal" inputmode="numeric" placeholder="ör. 2345678">
+    </label>
+    <label class="switch"><input type="checkbox" id="gonder" checked> Gelen verileri internete gönder</label>
+    <div class="row">
+      <span class="pill" id="netDurum"><span class="dot"></span><span id="netYazi">Henüz gönderilmedi</span></span>
+    </div>
+    <p class="note" id="grafikLink" hidden></p>
+  </section>
+
+  <section class="card">
+    <h2>Kayıt</h2>
+    <ol class="log" id="log"></ol>
+  </section>
+</div>
+
+<script>
+(function () {
+  // Kartla aynı UUID'ler (BLE_Gonderici.h)
+  const SERVIS = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+  const VERI   = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+  const MIN_ARALIK = 15500;   // ThingSpeak ücretsiz: en az 15 sn arayla
+
+  const $ = id => document.getElementById(id);
+  let cihaz = null, sonGonderim = 0, basarili = 0;
+
+  const sakla = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+  const oku = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+  $('anahtar').value = oku('ts_anahtar');
+  $('kanal').value = oku('ts_kanal');
+  $('anahtar').addEventListener('input', e => sakla('ts_anahtar', e.target.value.trim()));
+  $('kanal').addEventListener('input', e => { sakla('ts_kanal', e.target.value.trim()); grafikLinki(); });
+
+  function grafikLinki() {
+    const k = $('kanal').value.trim();
+    const el = $('grafikLink');
+    if (/^\d+$/.test(k)) {
+      el.hidden = false;
+      el.innerHTML = 'Grafikler: <a href="https://thingspeak.mathworks.com/channels/' + k + '" target="_blank" rel="noopener">thingspeak.mathworks.com/channels/' + k + '</a>';
+    } else el.hidden = true;
+  }
+  grafikLinki();
+
+  function kayit(m) {
+    const li = document.createElement('li');
+    li.textContent = new Date().toLocaleTimeString('tr-TR') + '  ' + m;
+    $('log').prepend(li);
+    while ($('log').children.length > 40) $('log').lastChild.remove();
+  }
+
+  function durum(id, yaziId, sinif, yazi) {
+    $(id).className = 'pill ' + (sinif || '');
+    $(yaziId).textContent = yazi;
+  }
+
+  const tr = (v, d) => Number(v).toFixed(d).replace('.', ',');
+
+  if (!navigator.bluetooth) {
+    $('uyari').hidden = false;
+    $('baglan').disabled = true;
+  }
+
+  $('baglan').onclick = async () => {
+    try {
+      durum('btDurum', 'btYazi', '', 'Cihaz aranıyor…');
+      cihaz = await navigator.bluetooth.requestDevice({
+        filters: [{ name: 'GunesPaneli' }],
+        optionalServices: [SERVIS]
+      });
+      cihaz.addEventListener('gattserverdisconnected', () => {
+        durum('btDurum', 'btYazi', 'bad', 'Bağlantı koptu');
+        $('baglan').disabled = false; $('kes').disabled = true;
+        kayit('Bluetooth bağlantısı koptu');
+      });
+      const sunucu = await cihaz.gatt.connect();
+      const servis = await sunucu.getPrimaryService(SERVIS);
+      const ozellik = await servis.getCharacteristic(VERI);
+      ozellik.addEventListener('characteristicvaluechanged', e => {
+        veriGeldi(new TextDecoder().decode(e.target.value));
+      });
+      await ozellik.startNotifications();
+      durum('btDurum', 'btYazi', 'ok', 'Bağlı: ' + (cihaz.name || 'GunesPaneli'));
+      $('baglan').disabled = true; $('kes').disabled = false;
+      kayit('Karta bağlanıldı, veri bekleniyor');
+      try { const ilk = await ozellik.readValue(); const s = new TextDecoder().decode(ilk); if (s) veriGeldi(s); } catch (e) {}
+    } catch (err) {
+      durum('btDurum', 'btYazi', 'bad', 'Bağlanamadı');
+      kayit('Hata: ' + err.message);
+    }
+  };
+
+  $('kes').onclick = () => { if (cihaz && cihaz.gatt.connected) cihaz.gatt.disconnect(); };
+
+  function veriGeldi(satir) {
+    const p = satir.trim().split(',').map(Number);
+    if (p.length < 8 || p.some(isNaN)) { kayit('Okunamayan veri: ' + satir); return; }
+    const [PS, PT, ES, ET, Ta, H, UV, KZ] = p;
+    $('vPS').textContent = tr(PS, 1) + ' W';
+    $('vPT').textContent = tr(PT, 1) + ' W';
+    $('vES').textContent = tr(ES, 1) + ' Wh';
+    $('vET').textContent = tr(ET, 1) + ' Wh';
+    $('vTa').textContent = tr(Ta, 1) + ' °C';
+    $('vH').textContent = '%' + Math.round(H);
+    $('vUV').textContent = tr(UV, 1);
+    $('vKazanc').textContent = (KZ >= 0 ? '+%' : '−%') + tr(Math.abs(KZ), 1);
+    $('vSon').textContent = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    kayit('Veri: ' + satir);
+    if ($('gonder').checked) internete(p);
+  }
+
+  async function internete(p) {
+    const anahtar = $('anahtar').value.trim();
+    if (!anahtar) { durum('netDurum', 'netYazi', 'bad', 'Write API Key girilmedi'); return; }
+    if (Date.now() - sonGonderim < MIN_ARALIK) { kayit('İnternet: 15 sn dolmadı, atlandı'); return; }
+    sonGonderim = Date.now();
+    const q = p.map((v, i) => 'field' + (i + 1) + '=' + encodeURIComponent(v)).join('&');
+    const url = 'https://api.thingspeak.com/update?api_key=' + encodeURIComponent(anahtar) + '&' + q;
+    try {
+      const yanit = await fetch(url);
+      const metin = (await yanit.text()).trim();
+      if (metin === '0') {
+        durum('netDurum', 'netYazi', 'bad', 'ThingSpeak kabul etmedi (anahtar ya da süre)');
+        kayit('İnternet: reddedildi');
+      } else {
+        basarili++;
+        durum('netDurum', 'netYazi', 'ok', 'Gönderildi · kayıt no ' + metin + ' · toplam ' + basarili);
+        kayit('İnternet: gönderildi (#' + metin + ')');
+      }
+    } catch (e) {
+      // Bazı tarayıcılar yanıtı okumaya izin vermez; isteği yine de gönder
+      try {
+        await fetch(url, { mode: 'no-cors' });
+        basarili++;
+        durum('netDurum', 'netYazi', 'ok', 'Gönderildi (yanıt okunamadı) · toplam ' + basarili);
+        kayit('İnternet: gönderildi (yanıt okunamadı)');
+      } catch (e2) {
+        durum('netDurum', 'netYazi', 'bad', 'İnternet yok ya da erişilemedi');
+        kayit('İnternet hatası: ' + e2.message);
+      }
+    }
+  }
+})();
+</script>
+</body>
+</html>
