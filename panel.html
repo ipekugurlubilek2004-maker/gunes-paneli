@@ -5,15 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Güneş Paneli Karşılaştırma Paneli</title>
 <style>
-/* Hocanın panel sayfası: üstte proje başlığı ve canlı durum, büyük kazanç, iki grafik, ortam ve son kayıtlar tablosu. */
+/* Hocanın panel sayfası: kazanç (günlük + anlık ibre), güç, enerji sütunları, UV analizi, çevre grafikleri, son kayıtlar. */
 :root {
   --bg: #F4F3EE; --surface: #FFFFFF; --fg: #14213D; --muted: #5B6678; --line: #E1DFD6;
-  --fixed: #2F6FAE; --track: #C27A00; --good: #1E7A4F; --bad: #C43D3D; --accent: #E89A1C;
+  --fixed: #2F6FAE; --track: #D98A0B; --good: #1E7A4F; --bad: #C43D3D; --warn: #D4A20B; --accent: #E89A1C;
+  --env1: #C2553A; --env2: #2E8FA3; --env3: #8A5CC2;
   --font: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #0B1220; --surface: #141E33; --fg: #E8EEF7; --muted: #8F9CB3; --line: #24324D;
-    --fixed: #5AA9E6; --track: #F5A524; --good: #3ECF8E; --bad: #FF6B6B; --accent: #F2B045; color-scheme: dark; }
+    --fixed: #5AA9E6; --track: #F5A524; --good: #3ECF8E; --bad: #FF6B6B; --warn: #F2C94C; --accent: #F2B045;
+    --env1: #F08A6E; --env2: #5BC8DB; --env3: #B48CF0; color-scheme: dark; }
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -23,7 +25,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--fo
 header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; }
 header .eb { font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
 header h1 { margin: 2px 0 4px; font-size: 1.9rem; line-height: 1.15; }
-header p { margin: 0; color: var(--muted); max-width: 60ch; }
+header p { margin: 0; color: var(--muted); max-width: 62ch; }
 .live { display: inline-flex; align-items: center; gap: 8px; font-size: .85rem; font-weight: 600; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; }
 .live i { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
 .live.ok { color: var(--good); } .live.ok i { background: var(--good); box-shadow: 0 0 0 4px rgba(62,207,142,.18); }
@@ -31,22 +33,32 @@ header p { margin: 0; color: var(--muted); max-width: 60ch; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px; min-width: 0; }
 .card h2 { margin: 0 0 12px; font-size: .78rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
 .card h2 small { font-weight: 500; letter-spacing: 0; text-transform: none; }
-.top { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 18px; }
+.card .not { margin: 10px 0 0; font-size: .82rem; color: var(--muted); }
+.top { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 18px; }
 @media (max-width: 860px) { .top { grid-template-columns: 1fr; } }
 .gain .v { font-size: 3.4rem; font-weight: 800; line-height: 1; color: var(--good); font-variant-numeric: tabular-nums; }
 .gain p { margin: 10px 0 0; color: var(--muted); }
 .gain p b { color: var(--fg); }
+.gauge { display: grid; justify-items: center; }
+.gauge svg { width: 100%; max-width: 240px; height: auto; display: block; }
+.gauge .gv { font-size: 1.9rem; font-weight: 800; margin-top: -6px; font-variant-numeric: tabular-nums; }
+.gauge .gl { font-size: .8rem; color: var(--muted); text-align: center; }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .m .l { font-size: .75rem; color: var(--muted); }
 .m .v { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .m.fixed .v { color: var(--fixed); } .m.track .v { color: var(--track); }
+.fark { margin-top: 14px; font-size: .85rem; color: var(--muted); }
+.fark b { color: var(--fg); }
 .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 @media (max-width: 860px) { .charts { grid-template-columns: 1fr; } }
 .cb { position: relative; height: 240px; }
+.cb.kucuk { height: 130px; }
 .cb canvas { width: 100%; height: 100%; display: block; }
 .legend { display: flex; gap: 14px; font-size: .8rem; color: var(--muted); margin-top: 8px; }
 .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: currentColor; }
-.env { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.env { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+@media (max-width: 860px) { .env { grid-template-columns: 1fr; } }
+.env .m .v { font-size: 1.4rem; }
 .tbl { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: .85rem; font-variant-numeric: tabular-nums; }
 th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -65,7 +77,7 @@ footer { color: var(--muted); font-size: .8rem; }
     <div>
       <div class="eb">Bitirme projesi · canlı veri</div>
       <h1>Sabit ve güneş takipli panel karşılaştırması</h1>
-      <p>Veriler CrowPanel ekrandan Bluetooth ile telefona, oradan ThingSpeak'e gönderiliyor. Bu sayfa 20 saniyede bir kendini yeniler.</p>
+      <p>Veriler CrowPanel ekrandan Bluetooth ile telefona, oradan ThingSpeak'e gönderiliyor. Mavi sabit paneli, turuncu güneşi takip eden paneli gösterir. Sayfa 20 saniyede bir kendini yeniler.</p>
     </div>
     <span class="live" id="live"><i></i><span id="liveT">Yükleniyor…</span></span>
   </header>
@@ -82,9 +94,21 @@ footer { color: var(--muted); font-size: .8rem; }
   <div id="main" class="wrap" hidden>
     <div class="top">
       <div class="card gain">
-        <h2>Enerji kazancı <small id="gSaat"></small></h2>
+        <h2>Günlük enerji kazancı <small id="gSaat"></small></h2>
         <div class="v" id="gV">–</div>
         <p id="gT">Veri bekleniyor.</p>
+      </div>
+      <div class="card gauge">
+        <h2 style="justify-self:stretch">Anlık kazanç</h2>
+        <svg viewBox="0 0 200 118" aria-label="Anlık kazanç göstergesi">
+          <g id="gArc"></g>
+          <line id="gIbre" x1="100" y1="100" x2="40" y2="100" stroke="currentColor" stroke-width="4" stroke-linecap="round" style="transition: all .8s ease"/>
+          <circle cx="100" cy="100" r="7" fill="currentColor"/>
+          <text x="20" y="116" font-size="11" text-anchor="middle" fill="currentColor" opacity=".6">0</text>
+          <text x="180" y="116" font-size="11" text-anchor="middle" fill="currentColor" opacity=".6">100</text>
+        </svg>
+        <div class="gv" id="gaV">–</div>
+        <div class="gl">takip panelinin şu anki güç fazlası</div>
       </div>
       <div class="card">
         <h2>Anlık güç</h2>
@@ -92,35 +116,39 @@ footer { color: var(--muted); font-size: .8rem; }
           <div class="m fixed"><div class="l">Sabit panel</div><div class="v" id="mPS">–</div></div>
           <div class="m track"><div class="l">Takip paneli</div><div class="v" id="mPT">–</div></div>
         </div>
-      </div>
-      <div class="card">
-        <h2>Günlük enerji</h2>
-        <div class="pair">
-          <div class="m fixed"><div class="l">Sabit panel</div><div class="v" id="mES">–</div></div>
-          <div class="m track"><div class="l">Takip paneli</div><div class="v" id="mET">–</div></div>
-        </div>
+        <div class="fark" id="mFark"></div>
       </div>
     </div>
 
     <div class="charts">
       <div class="card">
-        <h2>Güç (W) <small>son kayıtlar</small></h2>
+        <h2>Sabit ve takip panelinin gücü (W) <small>son 12 saat</small></h2>
         <div class="cb"><canvas id="cP"></canvas></div>
-        <div class="legend"><span style="color:var(--fixed)">Sabit</span><span style="color:var(--track)">Takip</span></div>
+        <div class="legend"><span style="color:var(--fixed)">Sabit panel</span><span style="color:var(--track)">Takip paneli</span></div>
       </div>
       <div class="card">
-        <h2>Biriken enerji (Wh)</h2>
+        <h2>Bugünkü toplam enerji (Wh)</h2>
+        <div class="cb"><canvas id="cEB"></canvas></div>
+        <p class="not" id="ebNot"></p>
+      </div>
+      <div class="card">
+        <h2>UV seviyesine göre kazanç <small id="uvAdet"></small></h2>
+        <div class="cb"><canvas id="cUV"></canvas></div>
+        <p class="not">Güneş alçaktayken (sabah, akşam, düşük UV) sabit panel güneşe eğik bakar; takip paneli asıl farkı bu saatlerde yaratır.</p>
+      </div>
+      <div class="card">
+        <h2>Biriken enerji (Wh) <small>son 12 saat</small></h2>
         <div class="cb"><canvas id="cE"></canvas></div>
-        <div class="legend"><span style="color:var(--fixed)">Sabit</span><span style="color:var(--track)">Takip</span></div>
+        <div class="legend"><span style="color:var(--fixed)">Sabit panel</span><span style="color:var(--track)">Takip paneli</span></div>
       </div>
     </div>
 
     <div class="card">
-      <h2>Ortam</h2>
+      <h2>Çevre koşulları <small>son 12 saat</small></h2>
       <div class="env">
-        <div class="m"><div class="l">Hava sıcaklığı</div><div class="v" id="mTa">–</div></div>
-        <div class="m"><div class="l">Bağıl nem</div><div class="v" id="mH">–</div></div>
-        <div class="m"><div class="l">UV indeksi</div><div class="v" id="mUV">–</div></div>
+        <div><div class="m"><div class="l">Hava sıcaklığı</div><div class="v" id="mTa" style="color:var(--env1)">–</div></div><div class="cb kucuk"><canvas id="cTa"></canvas></div></div>
+        <div><div class="m"><div class="l">Bağıl nem</div><div class="v" id="mH" style="color:var(--env2)">–</div></div><div class="cb kucuk"><canvas id="cH"></canvas></div></div>
+        <div><div class="m"><div class="l">UV indeksi</div><div class="v" id="mUV" style="color:var(--env3)">–</div></div><div class="cb kucuk"><canvas id="cU"></canvas></div></div>
       </div>
     </div>
 
@@ -142,11 +170,10 @@ footer { color: var(--muted); font-size: .8rem; }
   const tr = (v, d) => (v == null || isNaN(v)) ? '–' : Number(v).toFixed(d).replace('.', ',');
   const prm = new URLSearchParams(location.search);
   let kanal = prm.get('kanal') || '', oku = prm.get('anahtar') || '';
+  const BOSLUK = 120000;          // 2 dakikadan uzun veri boşluğunda çizgi kesilir
+  const PENCERE = 12 * 3600000;   // zaman grafikleri: son 12 saat
 
   function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
-
-  if (!/^\d+$/.test(kanal)) { $('setup').hidden = false; $('live').hidden = true; }
-  else baslat();
 
   $('iTamam').onclick = () => {
     const k = $('iKanal').value.trim();
@@ -155,11 +182,15 @@ footer { color: var(--muted); font-size: .8rem; }
     location.search = q.toString();
   };
 
-  function baslat() { $('main').hidden = false; yukle(); setInterval(yukle, 20000); window.addEventListener('resize', () => son && ciz(son)); }
+  function baslat() {
+    $('main').hidden = false; ibreKur(); yukle(); setInterval(yukle, 20000);
+    window.addEventListener('resize', () => son && ciz(son));
+    if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { ibreKur(); son && ciz(son); });
+  }
 
   let son = null;
   async function yukle() {
-    const url = 'https://api.thingspeak.com/channels/' + kanal + '/feeds.json?results=400' + (oku ? '&api_key=' + encodeURIComponent(oku) : '');
+    const url = 'https://api.thingspeak.com/channels/' + kanal + '/feeds.json?results=3000' + (oku ? '&api_key=' + encodeURIComponent(oku) : '');
     try {
       const r = await fetch(url);
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -173,31 +204,72 @@ footer { color: var(--muted); font-size: .8rem; }
     }
   }
 
+  // ---------- anlık kazanç ibresi (0-100) ----------
+  const GX = 100, GY = 100, GR = 80;
+  const nokta = (v, r) => { const a = Math.PI * (1 - Math.max(0, Math.min(100, v)) / 100); return [GX + r * Math.cos(a), GY - r * Math.sin(a)]; };
+  function ibreKur() {
+    const g = $('gArc'); g.innerHTML = '';
+    [[0, 10, '--bad'], [10, 25, '--warn'], [25, 100, '--good']].forEach(([a, b, c]) => {
+      const p1 = nokta(a, GR), p2 = nokta(b, GR);
+      const yol = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      yol.setAttribute('d', 'M' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1) + ' A' + GR + ' ' + GR + ' 0 0 1 ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1));
+      yol.setAttribute('fill', 'none'); yol.setAttribute('stroke', css(c)); yol.setAttribute('stroke-width', '16');
+      g.appendChild(yol);
+    });
+  }
+  function ibre(v) {
+    const p = nokta(isNaN(v) ? 0 : v, 64);
+    $('gIbre').setAttribute('x2', p[0].toFixed(1)); $('gIbre').setAttribute('y2', p[1].toFixed(1));
+    $('gIbre').style.opacity = isNaN(v) ? .3 : 1;
+    $('gaV').textContent = isNaN(v) ? '–' : (v >= 0 ? '+%' : '−%') + tr(Math.abs(v), 0);
+    $('gaV').style.color = isNaN(v) ? css('--muted') : css(v < 10 ? '--bad' : v < 25 ? '--warn' : '--good');
+  }
+
   function ciz(j) {
-    const f = j.feeds.map(x => ({ t: new Date(x.created_at), v: [1, 2, 3, 4, 5, 6, 7, 8].map(i => x['field' + i] == null ? NaN : parseFloat(x['field' + i])) }))
+    const f = j.feeds.map(x => ({ t: new Date(x.created_at), v: [1, 2, 3, 4, 5, 6, 7, 8].map(i => x['field' + i] == null || x['field' + i] === '' ? NaN : parseFloat(x['field' + i])) }))
       .filter(x => !isNaN(x.v[0]));
-    $('foot').textContent = (j.channel && j.channel.name ? j.channel.name + ' · ' : '') + 'Kanal ' + kanal + ' · ThingSpeak';
+    $('foot').textContent = (j.channel && j.channel.name ? j.channel.name + ' · ' : '') + 'Kanal ' + kanal + ' · ThingSpeak · ' + f.length + ' kayıt incelendi';
     if (!f.length) { $('live').className = 'live'; $('liveT').textContent = 'Henüz veri yok'; return; }
     const s = f[f.length - 1], v = s.v;
     const yas = (Date.now() - s.t.getTime()) / 1000;
     $('live').className = 'live ' + (yas < 90 ? 'ok' : '');
     $('liveT').textContent = yas < 90 ? 'Canlı · ' + Math.round(yas) + ' sn önce' : 'Son veri ' + s.t.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
-    // gunluk kazanc enerjilerden (alan 3-4) hesaplanir; alan 8 = anlik kazanc
+    // günlük kazanç enerjilerden (alan 3-4) hesaplanır; alan 8 = anlık kazanç
     const kz = v[2] > 0.05 ? (v[3] - v[2]) / v[2] * 100 : NaN;
     $('gV').textContent = isNaN(kz) ? '–' : (kz >= 0 ? '+%' : '−%') + tr(Math.abs(kz), 1);
     $('gV').style.color = isNaN(kz) || kz >= 0 ? css('--good') : css('--bad');
-    const ak = isNaN(v[7]) ? '' : ' Şu anki güç farkı: <b>' + (v[7] >= 0 ? '+%' : '−%') + tr(Math.abs(v[7]), 0) + '</b>.';
-    $('gT').innerHTML = (isNaN(kz) ? 'Gün yeni başladı; karşılaştırma için enerji birikmesi bekleniyor.' : 'Takip paneli bugün sabit panele göre <b>' + tr(Math.abs(kz), 1) + '% ' + (kz >= 0 ? 'daha fazla' : 'daha az') + '</b> enerji üretti.') + ak;
+    $('gT').innerHTML = isNaN(kz) ? 'Gün yeni başladı; karşılaştırma için enerji birikmesi bekleniyor.'
+      : 'Takip paneli bugün sabit panele göre <b>' + tr(Math.abs(kz), 1) + '% ' + (kz >= 0 ? 'daha fazla' : 'daha az') + '</b> enerji üretti: <b>' + tr(v[3], 1) + ' Wh</b> ile <b>' + tr(v[2], 1) + ' Wh</b>.';
     $('gSaat').textContent = s.t.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    ibre(v[7]);
     $('mPS').textContent = tr(v[0], 1) + ' W'; $('mPT').textContent = tr(v[1], 1) + ' W';
-    $('mES').textContent = tr(v[2], 1) + ' Wh'; $('mET').textContent = tr(v[3], 1) + ' Wh';
+    const fp = v[1] - v[0];
+    $('mFark').innerHTML = 'Takip paneli şu an <b>' + (fp >= 0 ? '+' : '−') + tr(Math.abs(fp), 1) + ' W</b> ' + (fp >= 0 ? 'fazla' : 'az') + ' üretiyor.';
     $('mTa').textContent = tr(v[4], 1) + ' °C'; $('mH').textContent = '%' + tr(v[5], 0); $('mUV').textContent = tr(v[6], 1);
 
-    grafik($('cP'), f, [0, 1], 'W');
-    grafik($('cE'), f, [2, 3], 'Wh');
+    const p12 = f.filter(x => x.t.getTime() > s.t.getTime() - PENCERE);
+    cizgi($('cP'), p12, [[0, '--fixed'], [1, '--track']], { sifir: true });
+    cizgi($('cE'), p12, [[2, '--fixed'], [3, '--track']], { sifir: true });
+    cizgi($('cTa'), p12, [[4, '--env1']], { kucuk: true });
+    cizgi($('cH'), p12, [[5, '--env2']], { kucuk: true });
+    cizgi($('cU'), p12, [[6, '--env3']], { kucuk: true, sifir: true });
 
-    $('adet').textContent = f.length + ' kayıt';
+    sutun($('cEB'), [v[2], v[3]], ['Sabit', 'Takip'], ['--fixed', '--track'], x => tr(x, 1) + ' Wh');
+    $('ebNot').textContent = isNaN(kz) ? '' : 'Fark: ' + tr(v[3] - v[2], 1) + ' Wh (' + (kz >= 0 ? '+%' : '−%') + tr(Math.abs(kz), 1) + ')';
+
+    // UV aralıklarına göre ortalama anlık kazanç (sabit panel 0,5 W altındaysa yüzde anlamsız: atla)
+    const sinir = [0, 2, 4, 6, 8, 99], top = [0, 0, 0, 0, 0], say = [0, 0, 0, 0, 0];
+    f.forEach(x => {
+      const ps = x.v[0], pt = x.v[1], uv = x.v[6];
+      if (!(ps > 0.5) || isNaN(pt) || isNaN(uv)) return;
+      for (let k = 0; k < 5; k++) if (uv >= sinir[k] && uv < sinir[k + 1]) { top[k] += (pt - ps) / ps * 100; say[k]++; break; }
+    });
+    const ort = top.map((t, k) => say[k] ? t / say[k] : NaN);
+    $('uvAdet').textContent = say.reduce((a, b) => a + b, 0) + ' ölçüm';
+    sutun($('cUV'), ort, ['UV 0-2', '2-4', '4-6', '6-8', '8+'], ['--track', '--track', '--track', '--track', '--track'], x => '%' + tr(x, 0));
+
+    $('adet').textContent = 'son 15 / ' + f.length;
     const tb = $('tb'); tb.innerHTML = '';
     f.slice(-15).reverse().forEach(x => {
       const row = document.createElement('tr');
@@ -208,39 +280,90 @@ footer { color: var(--muted); font-size: .8rem; }
     });
   }
 
-  function grafik(c, f, idx, birim) {
-    const r = c.getBoundingClientRect(); if (!r.width) return;
+  function tuval(c) {
+    const r = c.getBoundingClientRect(); if (!r.width) return null;
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     c.width = r.width * dpr; c.height = r.height * dpr;
     const x = c.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const W = r.width, H = r.height, L = 40, R = 10, T = 10, B = 24;
-    x.clearRect(0, 0, W, H);
-    let mx = 0; f.forEach(p => idx.forEach(i => { if (!isNaN(p.v[i])) mx = Math.max(mx, p.v[i]); }));
-    const adim = mx <= 25 ? 5 : mx <= 60 ? 10 : mx <= 150 ? 25 : 50;
-    mx = Math.max(adim, Math.ceil(mx / adim) * adim);
-    const Y = v => T + (H - T - B) * (1 - v / mx);
-    const t0 = f[0].t.getTime(), t1 = f[f.length - 1].t.getTime(), sp = Math.max(1, t1 - t0);
+    x.clearRect(0, 0, r.width, r.height);
+    x.font = '11px ' + css('--font');
+    return { x, W: r.width, H: r.height };
+  }
+  function guzelAdim(aralik, hedef) {
+    const ham = aralik / hedef, us = Math.pow(10, Math.floor(Math.log10(ham))), o = ham / us;
+    return (o <= 1 ? 1 : o <= 2 ? 2 : o <= 2.5 ? 2.5 : o <= 5 ? 5 : 10) * us;
+  }
+
+  // zaman çizgi grafiği; seri = [[alan, renk], ...]
+  function cizgi(c, f, seri, ops) {
+    const tv = tuval(c); if (!tv) return;
+    const { x, W, H } = tv;
+    const L = ops.kucuk ? 30 : 40, R = 10, T = 8, B = 22;
+    if (!f.length) { x.fillStyle = css('--muted'); x.fillText('Son 12 saatte veri yok', L, H / 2); return; }
+    let lo = Infinity, hi = -Infinity;
+    f.forEach(p => seri.forEach(([i]) => { if (!isNaN(p.v[i])) { lo = Math.min(lo, p.v[i]); hi = Math.max(hi, p.v[i]); } }));
+    if (!isFinite(lo)) return;
+    if (ops.sifir) lo = Math.min(0, lo);
+    if (hi - lo < 1) { hi += 0.5; lo -= 0.5; }
+    const adim = guzelAdim(hi - lo, ops.kucuk ? 3 : 5);
+    lo = Math.floor(lo / adim) * adim; hi = Math.ceil(hi / adim) * adim;
+    const Y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+    const t0 = f[0].t.getTime(), t1 = f[f.length - 1].t.getTime(), sp = Math.max(60000, t1 - t0);
     const X = t => L + (W - L - R) * (t - t0) / sp;
-    x.font = '11px ' + css('--font'); x.fillStyle = css('--muted'); x.strokeStyle = css('--line'); x.lineWidth = 1;
+    x.fillStyle = css('--muted'); x.strokeStyle = css('--line'); x.lineWidth = 1;
     x.textAlign = 'right'; x.textBaseline = 'middle';
-    for (let v = 0; v <= mx + 1e-9; v += adim) { x.beginPath(); x.moveTo(L, Y(v)); x.lineTo(W - R, Y(v)); x.stroke(); x.fillText(String(v), L - 6, Y(v)); }
-    x.textBaseline = 'alphabetic';
-    const fmt = d => d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-    x.textAlign = 'left'; x.fillText(fmt(f[0].t), L, H - 6);
-    x.textAlign = 'right'; x.fillText(fmt(f[f.length - 1].t), W - R, H - 6);
-    const renk = [css('--fixed'), css('--track')];
-    idx.forEach((i, k) => {
+    for (let v = lo; v <= hi + 1e-9; v += adim) { x.beginPath(); x.moveTo(L, Y(v)); x.lineTo(W - R, Y(v)); x.stroke(); x.fillText(String(+v.toFixed(2)).replace('.', ','), L - 5, Y(v)); }
+    // saat etiketleri
+    x.textBaseline = 'alphabetic'; x.textAlign = 'center';
+    const adimlar = [5, 10, 15, 30, 60, 120, 180, 360].map(d => d * 60000);
+    const enAz = (W - L - R) < 300 ? 3 : 6;
+    const st = adimlar.find(d => sp / d <= enAz) || adimlar[adimlar.length - 1];
+    const off = new Date(t0).getTimezoneOffset() * 60000;
+    for (let t = Math.ceil((t0 - off) / st) * st + off; t <= t1; t += st) {
+      x.fillText(new Date(t).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), X(t), H - 6);
+    }
+    seri.forEach(([i, rk]) => {
+      const renk = css(rk);
       x.beginPath(); let on = false;
       f.forEach((p, n) => {
         if (isNaN(p.v[i])) { on = false; return; }
-        // 10 dakikadan uzun boşlukta çizgiyi kes
-        if (on && n > 0 && p.t - f[n - 1].t > 600000) on = false;
+        if (on && p.t - f[n - 1].t > BOSLUK) on = false;
         on ? x.lineTo(X(p.t.getTime()), Y(p.v[i])) : x.moveTo(X(p.t.getTime()), Y(p.v[i])); on = true;
       });
-      x.strokeStyle = renk[k]; x.lineWidth = 2.2; x.lineJoin = 'round'; x.stroke();
-      const s = f[f.length - 1]; if (!isNaN(s.v[i])) { x.beginPath(); x.arc(X(t1), Y(s.v[i]), 3.5, 0, 7); x.fillStyle = renk[k]; x.fill(); }
+      x.strokeStyle = renk; x.lineWidth = ops.kucuk ? 1.8 : 2.2; x.lineJoin = 'round'; x.stroke();
+      const s = f[f.length - 1]; if (!isNaN(s.v[i])) { x.beginPath(); x.arc(X(t1), Y(s.v[i]), 3.5, 0, 7); x.fillStyle = renk; x.fill(); }
     });
   }
+
+  // sütun grafiği
+  function sutun(c, deger, adlar, renkler, yaz) {
+    const tv = tuval(c); if (!tv) return;
+    const { x, W, H } = tv;
+    const L = 40, R = 10, T = 22, B = 24;
+    let hi = 0; deger.forEach(v => { if (!isNaN(v)) hi = Math.max(hi, v); });
+    if (hi <= 0) { x.fillStyle = css('--muted'); x.fillText('Henüz veri yok', L, H / 2); return; }
+    const adim = guzelAdim(hi, 4); hi = Math.ceil(hi / adim) * adim;
+    const Y = v => T + (H - T - B) * (1 - Math.max(0, v) / hi);
+    x.fillStyle = css('--muted'); x.strokeStyle = css('--line'); x.lineWidth = 1;
+    x.textAlign = 'right'; x.textBaseline = 'middle';
+    for (let v = 0; v <= hi + 1e-9; v += adim) { x.beginPath(); x.moveTo(L, Y(v)); x.lineTo(W - R, Y(v)); x.stroke(); x.fillText(String(+v.toFixed(2)).replace('.', ','), L - 5, Y(v)); }
+    const n = deger.length, gen = (W - L - R) / n, bw = Math.min(90, gen * 0.6);
+    deger.forEach((v, k) => {
+      const cx = L + gen * (k + 0.5);
+      x.textAlign = 'center'; x.textBaseline = 'alphabetic'; x.fillStyle = css('--muted');
+      x.fillText(adlar[k], cx, H - 6);
+      if (isNaN(v)) return;
+      const y = Y(v);
+      x.fillStyle = css(renkler[k]);
+      x.beginPath(); x.roundRect ? x.roundRect(cx - bw / 2, y, bw, Y(0) - y, [6, 6, 0, 0]) : x.rect(cx - bw / 2, y, bw, Y(0) - y); x.fill();
+      x.fillStyle = css('--fg'); x.font = '600 12px ' + css('--font');
+      x.fillText(yaz(v), cx, y - 6);
+      x.font = '11px ' + css('--font');
+    });
+  }
+
+  if (!/^\d+$/.test(kanal)) { $('setup').hidden = false; $('live').hidden = true; }
+  else baslat();
 })();
 </script>
 </body>
