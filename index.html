@@ -141,7 +141,7 @@ nav.tabs .in { display: flex; width: 100%; max-width: 560px; }
 nav.tabs button { flex: 1; background: none; color: var(--muted); border-radius: 12px; padding: 6px 4px; min-height: 54px; display: grid; justify-items: center; gap: 2px; font-size: .72rem; font-weight: 600; }
 nav.tabs button svg { width: 24px; height: 24px; }
 nav.tabs button[aria-selected="true"] { color: var(--track); }
-section[hidden] { display: none !important; }
+[hidden] { display: none !important; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -177,7 +177,7 @@ section[hidden] { display: none !important; }
             <circle cx="75" cy="75" r="64" fill="none" stroke="#24324D" stroke-width="12"/>
             <circle id="ringArc" cx="75" cy="75" r="64" fill="none" stroke="#3ECF8E" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 402.1" style="transition: stroke-dasharray .8s ease"/>
           </svg>
-          <div class="c"><div><div class="v" id="vKazanc">–</div><div class="l">Enerji kazancı</div></div></div>
+          <div class="c"><div><div class="v" id="vKazanc">–</div><div class="l">Enerji kazancı</div><div class="l" id="vAnlik"></div></div></div>
         </div>
         <p id="heroText">Veri bekleniyor. Karta bağlanınca takip panelinin sabit panele göre ne kadar fazla enerji ürettiği burada görünür.</p>
       </div>
@@ -486,10 +486,12 @@ section[hidden] { display: none !important; }
   let sonKayit = 0, sonTS = 0;
 
   function veriGeldi(satir) {
-    const p = satir.trim().split(',').map(Number);
+    const ham = satir.trim().split(',');
+    const p = ham.map(Number);
+    const AK = ham[15] !== undefined && ham[15].trim() !== '' ? Number(ham[15]) : NaN;   // anlik kazanc (yoksa bos)
     if (p.length < 8 || p.slice(0, 8).some(isNaN)) { log('Okunamayan veri: ' + satir); return; }
     const d = { PS: p[0], PT: p[1], ES: p[2], ET: p[3], Ta: p[4], H: p[5], UV: p[6], KZ: p[7],
-                Tps: p[8], Tpt: p[9], lora: p[10], wifi: p[11], kanal: p[12], alarm: p[13], dk: p[14] };
+                Tps: p[8], Tpt: p[9], lora: p[10], wifi: p[11], kanal: p[12], alarm: p[13], dk: p[14], AK: AK };
     goster(d);
     grafik.push({ t: Date.now(), s: d.PS, k: d.PT });
     while (grafik.length > GRAFIK_NOKTA) grafik.shift();
@@ -504,7 +506,7 @@ section[hidden] { display: none !important; }
       yaz('kayitlar', kayitlar);
       if (!$('tab-gecmis').hidden) gecmisGoster();
     }
-    if (ayar.gonder && simdi - sonTS >= TS_ARALIK) { sonTS = simdi; internete({ t: new Date().toISOString(), f: p.slice(0, 8) }); }
+    if (ayar.gonder && simdi - sonTS >= TS_ARALIK) { sonTS = simdi; internete({ t: new Date().toISOString(), f: p.slice(0, 7).concat([isNaN(AK) ? '' : AK]) }); }   // Field 8 = anlik kazanc
   }
 
   const uvSeviye = u => u < 3 ? 'Düşük' : u < 6 ? 'Orta' : u < 8 ? 'Yüksek' : u < 11 ? 'Çok yüksek' : 'Aşırı';
@@ -516,6 +518,7 @@ section[hidden] { display: none !important; }
     const oran = Math.max(0, Math.min(1, Math.abs(kz) / 60));
     $('ringArc').setAttribute('stroke-dasharray', (oran * 402.1).toFixed(1) + ' 402.1');
     $('ringArc').setAttribute('stroke', kz >= 0 ? '#3ECF8E' : '#FF6B6B');
+    $('vAnlik').textContent = isNaN(d.AK) ? '' : 'şu an ' + (d.AK >= 0 ? '+%' : '−%') + tr(Math.abs(d.AK), 0);
     $('heroText').innerHTML = d.ES > 0.05
       ? 'Takip paneli bugün sabit panele göre <b>' + tr(Math.abs(kz), 1) + '% ' + (kz >= 0 ? 'daha fazla' : 'daha az') + '</b> enerji üretti: <b>' + tr(d.ET, 1) + ' Wh</b> ile <b>' + tr(d.ES, 1) + ' Wh</b>.'
       : 'Gün yeni başladı; karşılaştırma için biraz enerji birikmesi bekleniyor.';
@@ -547,7 +550,7 @@ section[hidden] { display: none !important; }
 
   // ---------- ThingSpeak ----------
   function tsUrl(k) {
-    let q = 'api_key=' + encodeURIComponent(ayar.anahtar) + '&' + k.f.map((v, i) => 'field' + (i + 1) + '=' + encodeURIComponent(v)).join('&');
+    let q = 'api_key=' + encodeURIComponent(ayar.anahtar) + '&' + k.f.map((v, i) => v === '' || v === null ? '' : 'field' + (i + 1) + '=' + encodeURIComponent(v)).filter(Boolean).join('&');
     if (k.eski) q += '&created_at=' + encodeURIComponent(k.t);
     return 'https://api.thingspeak.com/update?' + q;
   }
