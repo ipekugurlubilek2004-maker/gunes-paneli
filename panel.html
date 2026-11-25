@@ -198,12 +198,38 @@ footer { color: var(--muted); font-size: .8rem; }
       </div>
     </div>
 
+    <div class="charts">
+      <div class="card">
+        <h2>Güneşin konumu <small id="gnsTarih"></small></h2>
+        <div class="cb"><canvas id="cGunes"></canvas></div>
+        <div class="env" style="margin-top:12px">
+          <div class="m"><div class="l">Yükseklik</div><div class="v" id="gnsYuk">–</div></div>
+          <div class="m"><div class="l">Yön (azimut)</div><div class="v" id="gnsAz">–</div></div>
+          <div class="m"><div class="l">Sabit panele geliş açısı</div><div class="v" id="gnsGel">–</div></div>
+        </div>
+        <p class="not" id="gnsNot">Balıkesir Üniversitesi Çağış Yerleşkesi (39,54° K, 28,01° D). Sabit panel 30° eğik, güneye bakıyor; takip paneli çift eksenli.</p>
+      </div>
+      <div class="card">
+        <h2>Teorik model ile karşılaştırma <small>bugün</small></h2>
+        <div class="cb"><canvas id="cTeori"></canvas></div>
+        <div class="legend"><span style="color:var(--muted)">Teorik (açık hava)</span><span style="color:var(--track)">Ölçülen anlık kazanç</span></div>
+        <p class="not" id="teoriNot">Teorik kazanç: güneşin konumundan hesaplanan, açık havada takip panelinin sabit panele göre fazla alacağı ışınım.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Kirlenme takibi <small id="kirDurum"></small></h2>
+      <div class="cb"><canvas id="cKir"></canvas></div>
+      <div class="legend"><span style="color:var(--fixed)">Sabit panel</span><span style="color:var(--track)">Takip paneli</span></div>
+      <p class="not" id="kirNot">Her gün için panelin ürettiği gücün, aynı ışıkta beklenen güce oranı (performans oranı). UV sensörü tozdan etkilenmediği için referans alınır. Oran günler içinde düşüyorsa panel kirleniyor demektir.</p>
+    </div>
+
     <div class="card">
       <h2>Günlük özet ve günlerin karşılaştırması <small id="gunAdet"></small></h2>
       <div class="cb"><canvas id="cGun"></canvas></div>
       <div class="legend"><span style="color:var(--fixed)">Sabit panel (Wh)</span><span style="color:var(--track)">Takip paneli (Wh)</span></div>
       <div class="tbl" style="margin-top:12px"><table>
-        <thead><tr><th>Gün</th><th>Zaman</th><th>Sabit Wh</th><th>Takip Wh</th><th>Kazanç</th><th>En yüksek UV</th><th>Hava</th></tr></thead>
+        <thead><tr><th>Gün</th><th>Zaman</th><th>Sabit Wh</th><th>Takip Wh</th><th>Kazanç</th><th>Teorik kazanç</th><th>Motor Wh</th><th>En yüksek UV</th><th>Hava</th></tr></thead>
         <tbody id="tbGun"></tbody>
       </table></div>
       <p class="not">Gün, enerji sayacının sıfırlandığı andan (yeni gün) bir sonrakine kadar sayılır. Simülasyonda bir gün yaklaşık 1 saat sürer.</p>
@@ -226,7 +252,7 @@ footer { color: var(--muted); font-size: .8rem; }
       <h2>Ekonomik hesap</h2>
       <div class="eko">
         <label>Elektrik fiyatı (TL/kWh)<input id="eFiyat" type="number" step="0.01" inputmode="decimal"></label>
-        <label>Takip motoru tüketimi (Wh/gün, ölçülen panel)<input id="eMotor" type="number" step="0.1" inputmode="decimal"></label>
+        <label>Motor tüketimi (Wh/gün; boşsa ölçülen kullanılır)<input id="eMotor" type="number" step="0.1" inputmode="decimal" placeholder="ölçülen"></label>
         <label>Takip sisteminin ek maliyeti (TL, 1 kW için)<input id="eMaliyet" type="number" step="1" inputmode="decimal"></label>
         <label>Ölçeklenecek sistem gücü (kW)<input id="eOlcek" type="number" step="0.5" inputmode="decimal"></label>
       </div>
@@ -334,7 +360,9 @@ footer { color: var(--muted); font-size: .8rem; }
   function ciz(j) {
     const simS = x => { const m = /(\d{1,2}:\d{2})/.exec(x || ''); return m ? m[1] : '–'; };
     const durumSayi = (x, ad) => { const m = new RegExp(ad + '=(-?[\\d.]+)').exec(x || ''); return m ? parseFloat(m[1]) : NaN; };
-    const f = j.feeds.map(x => ({ t: new Date(x.created_at), sim: simS(x.status), ts: durumSayi(x.status, 'Ts'), tt: durumSayi(x.status, 'Tt'), v: [1, 2, 3, 4, 5, 6, 7, 8].map(i => x['field' + i] == null || x['field' + i] === '' ? NaN : parseFloat(x['field' + i])) }))
+    const simDk = s => { const m = /(\d{1,2}):(\d{2})/.exec(s || ''); return m ? +m[1] * 60 + +m[2] : NaN; };
+    const f = j.feeds.map(x => ({ t: new Date(x.created_at), sim: simS(x.status), dk: simDk(x.status), N: yilinGunu(new Date(x.created_at)),
+      ts: durumSayi(x.status, 'Ts'), tt: durumSayi(x.status, 'Tt'), em: durumSayi(x.status, 'Em'), v: [1, 2, 3, 4, 5, 6, 7, 8].map(i => x['field' + i] == null || x['field' + i] === '' ? NaN : parseFloat(x['field' + i])) }))
       .filter(x => !isNaN(x.v[0]));
     $('foot').textContent = (j.channel && j.channel.name ? j.channel.name + ' · ' : '') + 'Kanal ' + kanal + ' · ThingSpeak · ' + f.length + ' kayıt incelendi';
     if (!f.length) { $('live').className = 'live'; $('liveT').textContent = 'Henüz veri yok'; return; }
@@ -365,6 +393,9 @@ footer { color: var(--muted); font-size: .8rem; }
 
     sonKayitlar = f;
     gunlukOzet(f);
+    gunesBolumu(f);
+    teoriBolumu();
+    kirlenme();
     sicaklikEtkisi(f);
     ekonomi();
 
@@ -475,6 +506,52 @@ footer { color: var(--muted); font-size: .8rem; }
     });
   }
 
+  // =============================================================== GÜNEŞ MODELİ
+  // Kartla aynı formüller (Gunes_Model.cpp): NOAA güneş konumu, Meinel açık hava ışınımı.
+  const DR = Math.PI / 180, ENLEM = 39.541, BOYLAM = 28.009, DILIM = 3, EGIM = 30, YON = 180, PANEL_W = 20;
+  function yilinGunu(d) { return Math.floor((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(d.getFullYear(), 0, 0)) / 864e5); }
+  function gunesKonum(N, dk) {
+    const y = 2 * Math.PI / 365 * (N - 1 + (dk / 60 - 12) / 24);
+    const denk = 229.18 * (0.000075 + 0.001868 * Math.cos(y) - 0.032077 * Math.sin(y) - 0.014615 * Math.cos(2 * y) - 0.040849 * Math.sin(2 * y));
+    const dek = 0.006918 - 0.399912 * Math.cos(y) + 0.070257 * Math.sin(y) - 0.006758 * Math.cos(2 * y) + 0.000907 * Math.sin(2 * y) - 0.002697 * Math.cos(3 * y) + 0.00148 * Math.sin(3 * y);
+    const H = ((dk + denk + 4 * BOYLAM - 60 * DILIM) / 4 - 180) * DR, lat = ENLEM * DR;
+    const cosZ = Math.max(-1, Math.min(1, Math.sin(lat) * Math.sin(dek) + Math.cos(lat) * Math.cos(dek) * Math.cos(H)));
+    const Z = Math.acos(cosZ);
+    const az = ((Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(lat) - Math.tan(dek) * Math.cos(lat)) / DR + 180) % 360 + 360) % 360;
+    const b = EGIM * DR, cosI = cosZ * Math.cos(b) + Math.sin(Z) * Math.sin(b) * Math.cos((az - YON) * DR);
+    return { yuk: 90 - Z / DR, az, gel: Math.acos(Math.max(-1, Math.min(1, cosI))) / DR };
+  }
+  function isinim(g, bulut) {
+    if (g.yuk <= 0.5) return { yatay: 0, sabit: 0, takip: 0 };
+    const Z = 90 - g.yuk, am = 1 / (Math.cos(Z * DR) + 0.50572 * Math.pow(96.07995 - Z, -1.6364));
+    const acik = 1353 * Math.pow(0.7, Math.pow(am, 0.678)), dni = acik * (1 - 0.85 * bulut), dif = acik * (0.10 + 0.20 * bulut);
+    const cosI = Math.cos(g.gel * DR);
+    return { yatay: dni * Math.cos(Z * DR) + dif, sabit: dni * Math.max(0, cosI) + dif * (1 + Math.cos(EGIM * DR)) / 2, takip: dni + dif };
+  }
+  function dogusBatis(N) {
+    let d = NaN, b = NaN;
+    for (let dk = 180; dk < 1320; dk += 2) { if (gunesKonum(N, dk).yuk > -0.83) { if (isNaN(d)) d = dk; b = dk; } }
+    return { d, b };
+  }
+  const teorikAnlik = g => { const i = isinim(g, 0); return i.sabit < 50 ? NaN : (i.takip / i.sabit - 1) * 100; };
+  function teorikGunluk(N) {
+    const { d, b } = dogusBatis(N); let s = 0, t = 0;
+    for (let dk = d; dk <= b; dk += 5) { const i = isinim(gunesKonum(N, dk), 0); s += i.sabit; t += i.takip; }
+    return s > 0 ? (t / s - 1) * 100 : NaN;
+  }
+  // Bir ölçüm için: UV'den yatay ışınım tahmini ve panellere beklenen ışınım (açık havaya yakın anlar)
+  function beklenen(x) {
+    if (isNaN(x.dk) || !(x.v[6] > 0.2)) return null;
+    const g = gunesKonum(x.N, x.dk); if (g.yuk < 15) return null;
+    const ac = isinim(g, 0); if (ac.yatay < 200) return null;
+    const ghi = 1000 * Math.pow(x.v[6] / 10, 1 / 1.4), aciklik = ghi / ac.yatay;
+    if (aciklik < 0.85) return null;                    // bulutlu an: oranlar güvenilmez
+    return { g, Gs: ghi * ac.sabit / ac.yatay, Gt: ghi * ac.takip / ac.yatay };
+  }
+  const medyan = a => { const b = a.filter(v => !isNaN(v)).sort((p, q) => p - q); return b.length ? b[Math.floor(b.length / 2)] : NaN; };
+  const yonAdi = az => ['K', 'KD', 'D', 'GD', 'G', 'GB', 'B', 'KB'][Math.floor((az + 22.5) / 45) % 8];
+  const dkYaz = dk => String(Math.floor(dk / 60)).padStart(2, '0') + ':' + String(Math.floor(dk % 60)).padStart(2, '0');
+
   // =============================================================== ANALİZLER
   let sonKayitlar = [], sonGunler = [];
   const saatYaz = d => d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
@@ -492,8 +569,18 @@ footer { color: var(--muted); font-size: .8rem; }
     });
     return g.filter(d => d.length >= 3).map((d, i, h) => {
       const es = enBuyuk(d.map(x => x.v[2])), et = enBuyuk(d.map(x => x.v[3])), mu = enBuyuk(d.map(x => x.v[6]));
+      // performans oranı (kirlenme): ölçülen güç / aynı ışıkta beklenen güç
+      const prS = [], prT = [];
+      d.forEach(x => {
+        const e = beklenen(x); if (!e) return;
+        const tfS = isNaN(x.ts) ? 1 : 1 - 0.004 * (x.ts - 25), tfT = isNaN(x.tt) ? 1 : 1 - 0.004 * (x.tt - 25);
+        if (e.Gs > 150) prS.push(x.v[0] / (PANEL_W * e.Gs / 1000 * tfS) * 100);
+        if (e.Gt > 150) prT.push(x.v[1] / (PANEL_W * e.Gt / 1000 * tfT) * 100);
+      });
       return {
         no: i + 1, bas: d[0].t, bit: d[d.length - 1].t, es, et, kz: es > 1 ? (et - es) / es * 100 : NaN, maxUV: mu,
+        teorik: teorikGunluk(d[d.length - 1].N), em: enBuyuk(d.map(x => x.em)), prS: medyan(prS), prT: medyan(prT), prN: Math.min(prS.length, prT.length),
+        kayit: d,
         hava: isNaN(mu) ? '–' : mu >= 7 ? 'Güneşli' : mu >= 4 ? 'Parçalı bulutlu' : 'Bulutlu', n: d.length, devam: i === h.length - 1
       };
     });
@@ -508,7 +595,7 @@ footer { color: var(--muted); font-size: .8rem; }
     gunler.slice().reverse().forEach(d => {
       const row = document.createElement('tr');
       [d.no + (d.devam ? ' (devam ediyor)' : ''), tarihYaz(d.bas) + ' ' + saatYaz(d.bas) + '–' + saatYaz(d.bit), tr(d.es, 1), tr(d.et, 1),
-       isNaN(d.kz) ? '–' : (d.kz >= 0 ? '+%' : '−%') + tr(Math.abs(d.kz), 1), tr(d.maxUV, 1), d.hava]
+       isNaN(d.kz) ? '–' : (d.kz >= 0 ? '+%' : '−%') + tr(Math.abs(d.kz), 1), isNaN(d.teorik) ? '–' : '+%' + tr(d.teorik, 1), tr(d.em, 2), tr(d.maxUV, 1), d.hava]
         .forEach((t, i) => { const td = document.createElement('td'); td.textContent = t; if (i === 2) td.style.color = css('--fixed'); if (i === 3) td.style.color = css('--track'); row.appendChild(td); });
       tb.appendChild(row);
     });
@@ -526,15 +613,59 @@ footer { color: var(--muted); font-size: .8rem; }
       ' Hava tipi günün en yüksek UV değerinden belirlenir (7+ güneşli, 4–7 parçalı, 4 altı bulutlu).';
   }
 
-  // Sıcaklık etkisi: takip paneli hep güneşe dik baktığı için açı etkisi yok; ışınım UV'den tahmin edilir
+  // Güneşin konumu: son ölçümün simülasyon saati ve tarihi
+  function gunesBolumu(f) {
+    const s = f.slice().reverse().find(x => !isNaN(x.dk));
+    const N = s ? s.N : yilinGunu(new Date()), dk = s ? s.dk : new Date().getHours() * 60 + new Date().getMinutes();
+    const g = gunesKonum(N, dk), db = dogusBatis(N);
+    $('gnsYuk').textContent = tr(g.yuk, 1) + '°';
+    $('gnsAz').textContent = tr(g.az, 0) + '° ' + yonAdi(g.az);
+    $('gnsGel').textContent = g.yuk > 0 ? tr(g.gel, 0) + '°' : 'gece';
+    const gun = new Date(new Date().getFullYear(), 0, N);
+    $('gnsTarih').textContent = gun.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) + ' · ' + (s ? 'sim. ' : '') + dkYaz(dk);
+    const egri = []; for (let m = db.d - 30; m <= db.b + 30; m += 5) egri.push({ x: m, y: gunesKonum(N, m).yuk });
+    xyGrafik($('cGunes'), [{ p: egri, renk: '--accent' }, { p: [{ x: dk, y: g.yuk }], renk: '--track', nokta: 6 }], { xSaat: true, yBirim: '°', yMin: Math.min(0, ...egri.map(p => p.y)) });
+    $('gnsNot').textContent = 'Doğuş ' + dkYaz(db.d) + ', batış ' + dkYaz(db.b) + ', öğlen en yüksek ' + tr(gunesKonum(N, (db.d + db.b) / 2).yuk, 0) +
+      '°. Balıkesir Üniversitesi Çağış Yerleşkesi (39,54° K, 28,01° D); sabit panel 30° eğik ve güneye bakıyor, takip paneli çift eksenli.';
+  }
+
+  // Teorik model: bugünün açık hava kazancı ile ölçülen anlık kazanç
+  function teoriBolumu() {
+    const gun = sonGunler[sonGunler.length - 1];
+    if (!gun) { xyGrafik($('cTeori'), [], {}); return; }
+    const N = gun.kayit[gun.kayit.length - 1].N, db = dogusBatis(N);
+    const teo = []; for (let m = db.d + 20; m <= db.b - 20; m += 5) { const k = teorikAnlik(gunesKonum(N, m)); if (!isNaN(k) && k < 150) teo.push({ x: m, y: k }); }
+    const olc = gun.kayit.filter(x => !isNaN(x.dk) && x.v[7] > 0 && x.v[0] >= 2).map(x => ({ x: x.dk, y: Math.min(x.v[7], 150) }));
+    xyGrafik($('cTeori'), [{ p: teo, renk: '--muted', kesik: true }, { p: olc, renk: '--track', nokta: 2.6 }], { xSaat: true, yBirim: '%', yMin: 0 });
+    $('teoriNot').innerHTML = 'Bugün için teorik günlük kazanç <b>+%' + tr(gun.teorik, 1) + '</b>, ölçülen <b>' + (isNaN(gun.kz) ? '–' : (gun.kz >= 0 ? '+%' : '−%') + tr(Math.abs(gun.kz), 1)) +
+      '</b>. Fark; bulut, panel sıcaklığı, kirlenme ve takip hassasiyetinden kaynaklanır. Teorik değer açık havada güneşin konumundan hesaplanır.';
+  }
+
+  // Kirlenme: günlük performans oranlarının seyri
+  function kirlenme() {
+    const g = sonGunler.filter(d => d.prN >= 5);
+    xyGrafik($('cKir'), [
+      { p: g.map(d => ({ x: d.no, y: d.prS })), renk: '--fixed', nokta: 3.5, cizgi: true },
+      { p: g.map(d => ({ x: d.no, y: d.prT })), renk: '--track', nokta: 3.5, cizgi: true }], { xEtiket: v => 'G' + v, yBirim: '%' });
+    if (g.length < 2) { $('kirDurum').textContent = 'veri birikiyor'; return; }
+    const son = g[g.length - 1], once = g.slice(0, -1);
+    const enIyi = k => enBuyuk(once.map(d => d[k]));
+    const dS = (enIyi('prS') - son.prS) / enIyi('prS') * 100, dT = (enIyi('prT') - son.prT) / enIyi('prT') * 100;
+    const kotu = Math.max(dS, dT);
+    $('kirDurum').textContent = kotu > 5 ? 'temizlik önerilir' : 'temiz';
+    $('kirDurum').style.color = kotu > 5 ? css('--bad') : css('--good');
+    $('kirNot').innerHTML = 'Son gün performans oranı: sabit <b>%' + tr(son.prS, 1) + '</b>, takip <b>%' + tr(son.prT, 1) + '</b>. En iyi güne göre düşüş: sabit %' + tr(Math.max(0, dS), 1) +
+      ', takip %' + tr(Math.max(0, dT), 1) + '. ' + (kotu > 5 ? '<b>Panel yüzeyi kirlenmiş olabilir, temizlenmesi önerilir.</b> ' : '') +
+      'Oran, gücün aynı ışıkta beklenen güce bölünmesiyle bulunur; UV sensörü tozdan etkilenmediği için referans alınır. Sadece açık havaya yakın anlar kullanılır.';
+  }
+
+  // Sıcaklık etkisi: takip paneli hep güneşe dik baktığı için açı etkisi yok; ışınım UV ve güneş konumundan tahmin edilir
   function sicaklikEtkisi(f) {
     const pts = [];
     f.forEach(x => {
-      const uv = x.v[6], p = x.v[1];
-      if (isNaN(x.tt) || !(uv > 0.3) || isNaN(p)) return;
-      const G = 1000 * Math.pow(uv / 10, 1 / 1.4);
-      if (G < 250) return;
-      pts.push({ x: x.tt, y: p / (20 * G / 1000) * 100 });
+      if (isNaN(x.tt) || isNaN(x.v[1])) return;
+      const e = beklenen(x); if (!e || e.Gt < 250) return;
+      pts.push({ x: x.tt, y: x.v[1] / (PANEL_W * e.Gt / 1000) * 100 });
     });
     $('sicAdet').textContent = pts.length + ' ölçüm';
     if (pts.length < 15) {
@@ -550,11 +681,11 @@ footer { color: var(--muted); font-size: .8rem; }
     $('sicNot').innerHTML = (katsayi > 0
       ? 'Takip paneli her <b>1 °C</b> ısındığında verimi yaklaşık <b>%' + tr(katsayi, 2) + '</b> düşüyor; 25 °C\'den 45 °C\'ye ısınınca güç yaklaşık <b>%' + tr(katsayi * 20, 0) + '</b> azalır.'
       : 'Bu verilerde sıcaklıkla belirgin bir verim düşüşü görülmedi.') +
-      ' Yatay eksen panel sıcaklığı, dikey eksen göreli verim (%). Işınım ölçülmediği için UV indeksinden tahmin edildi.';
+      ' Yatay eksen panel sıcaklığı, dikey eksen göreli verim (%). Işınım ölçülmediği için UV indeksi ve güneşin konumundan tahmin edildi; sadece açık havaya yakın anlar kullanıldı.';
   }
 
   // Ekonomik hesap
-  const ekoVars = { fiyat: 3, motor: 0, maliyet: '', olcek: 1 };
+  const ekoVars = { fiyat: 3, motor: '', maliyet: '', olcek: 1 };
   let eko = Object.assign({}, ekoVars);
   try { Object.assign(eko, JSON.parse(sakla.al('eko') || '{}')); } catch (e) {}
   [['eFiyat', 'fiyat'], ['eMotor', 'motor'], ['eMaliyet', 'maliyet'], ['eOlcek', 'olcek']].forEach(([id, k]) => {
@@ -565,7 +696,10 @@ footer { color: var(--muted); font-size: .8rem; }
     let gunler = sonGunler.filter(d => !d.devam && d.es > 1);
     const devamla = !gunler.length;
     if (devamla) gunler = sonGunler.filter(d => d.es > 1);
-    const fiyat = parseFloat(eko.fiyat), motor = parseFloat(eko.motor) || 0, maliyet = parseFloat(eko.maliyet), olcek = parseFloat(eko.olcek) || 1;
+    const olculenMotor = ort(gunler.map(d => d.em));
+    const elle = String(eko.motor).trim() !== '' && !isNaN(parseFloat(eko.motor));
+    const motor = elle ? parseFloat(eko.motor) : (isNaN(olculenMotor) ? 0 : olculenMotor);
+    const fiyat = parseFloat(eko.fiyat), maliyet = parseFloat(eko.maliyet), olcek = parseFloat(eko.olcek) || 1;
     const dE = ort(gunler.map(d => d.et - d.es)) - motor;                 // Wh/gün, ölçülen 20 W panel
     const gunlukWh = dE * olcek * 1000 / 20;
     const yillikKWh = gunlukWh * 365 / 1000;
@@ -578,7 +712,8 @@ footer { color: var(--muted); font-size: .8rem; }
         kutu('Yıllık ek enerji (' + tr(olcek, 1) + ' kW)', tr(yillikKWh, 0) + ' kWh') +
         kutu('Yıllık kazanç', isNaN(yillikTL) ? '–' : tr(yillikTL, 0) + ' TL', '--good') +
         kutu('Geri ödeme süresi', isNaN(geri) ? 'maliyeti gir' : tr(geri, 1) + ' yıl') +
-        '<p class="not" style="grid-column:1/-1">' + gunler.length + ' günün ortalaması' + (devamla ? ' (henüz biten gün yok; devam eden gün kullanıldı)' : '') + '.</p>';
+        '<p class="not" style="grid-column:1/-1">' + gunler.length + ' günün ortalaması' + (devamla ? ' (henüz biten gün yok; devam eden gün kullanıldı)' : '') +
+        '. Motor tüketimi: ' + tr(motor, 2) + ' Wh/gün (' + (elle ? 'elle girildi' : isNaN(olculenMotor) ? 'ölçüm yok' : 'ölçülen') + '), farktan düşüldü.</p>';
   }
 
   // Rapor indirme (CSV, Excel uyumlu)
@@ -598,9 +733,9 @@ footer { color: var(--muted); font-size: .8rem; }
       .concat(sonKayitlar.map(x => [x.t.toLocaleDateString('tr-TR'), x.t.toLocaleTimeString('tr-TR'), x.sim === '–' ? '' : x.sim,
         csvSayi(x.v[0], 2), csvSayi(x.v[1], 2), csvSayi(x.v[2], 2), csvSayi(x.v[3], 2), csvSayi(x.v[4], 1), csvSayi(x.v[5], 0), csvSayi(x.v[6], 1), csvSayi(x.v[7], 1), csvSayi(x.ts, 1), csvSayi(x.tt, 1)])));
   $('csvGun').onclick = () => indir('gunes-paneli-gunluk-ozet-' + bugun() + '.csv',
-    [['Gün', 'Başlangıç', 'Bitiş', 'Sabit enerji (Wh)', 'Takip enerji (Wh)', 'Fark (Wh)', 'Kazanç (%)', 'En yüksek UV', 'Hava', 'Kayıt sayısı', 'Durum']]
+    [['Gün', 'Başlangıç', 'Bitiş', 'Sabit enerji (Wh)', 'Takip enerji (Wh)', 'Fark (Wh)', 'Kazanç (%)', 'Teorik kazanç (%)', 'Motor (Wh)', 'Perf. oranı sabit (%)', 'Perf. oranı takip (%)', 'En yüksek UV', 'Hava', 'Kayıt sayısı', 'Durum']]
       .concat(sonGunler.map(d => [d.no, d.bas.toLocaleString('tr-TR'), d.bit.toLocaleString('tr-TR'), csvSayi(d.es, 2), csvSayi(d.et, 2), csvSayi(d.et - d.es, 2),
-        csvSayi(d.kz, 1), csvSayi(d.maxUV, 1), d.hava, d.n, d.devam ? 'devam ediyor' : 'tamamlandı'])));
+        csvSayi(d.kz, 1), csvSayi(d.teorik, 1), csvSayi(d.em, 2), csvSayi(d.prS, 1), csvSayi(d.prT, 1), csvSayi(d.maxUV, 1), d.hava, d.n, d.devam ? 'devam ediyor' : 'tamamlandı'])));
 
   // ---------- ek grafikler ----------
   function sutunGrup(c, gruplar) {
@@ -625,6 +760,34 @@ footer { color: var(--muted); font-size: .8rem; }
       x.textAlign = 'center'; x.textBaseline = 'alphabetic';
       x.fillStyle = css('--muted'); x.fillText(g.ad, cx, H - 6);
       if (g.ust) { x.fillStyle = css('--fg'); x.font = '600 11px ' + css('--font'); x.fillText(g.ust, cx, Y(enBuyuk(g.d)) - 5); x.font = '11px ' + css('--font'); }
+    });
+  }
+
+  // Genel x-y grafiği: seriler = [{ p:[{x,y}], renk, nokta(yarıçap, yalnız nokta), kesik }]
+  function xyGrafik(c, seriler, o) {
+    const tv = tuval(c); if (!tv) return;
+    const { x, W, H } = tv;
+    const L = 40, R = 12, T = 10, B = 24;
+    const hep = [].concat(...seriler.map(s => s.p)).filter(p => !isNaN(p.x) && !isNaN(p.y));
+    if (!hep.length) { x.fillStyle = css('--muted'); x.fillText('Veri birikiyor', L, H / 2); return; }
+    let x0 = Math.min(...hep.map(p => p.x)), x1 = Math.max(...hep.map(p => p.x));
+    let y0 = o.yMin !== undefined ? Math.min(o.yMin, ...hep.map(p => p.y)) : Math.min(...hep.map(p => p.y)), y1 = Math.max(...hep.map(p => p.y));
+    if (x1 - x0 < 1) { x0 -= 1; x1 += 1; } if (y1 - y0 < 1) { y0 -= 1; y1 += 1; }
+    const ay = guzelAdim(y1 - y0, 4); y0 = Math.floor(y0 / ay) * ay; y1 = Math.ceil(y1 / ay) * ay;
+    const X = v => L + (W - L - R) * (v - x0) / (x1 - x0), Y = v => T + (H - T - B) * (1 - (v - y0) / (y1 - y0));
+    x.fillStyle = css('--muted'); x.strokeStyle = css('--line'); x.lineWidth = 1; x.textAlign = 'right'; x.textBaseline = 'middle';
+    for (let v = y0; v <= y1 + 1e-9; v += ay) { x.beginPath(); x.moveTo(L, Y(v)); x.lineTo(W - R, Y(v)); x.stroke(); x.fillText(String(+v.toFixed(1)).replace('.', ',') + (o.yBirim || ''), L - 5, Y(v)); }
+    x.textAlign = 'center'; x.textBaseline = 'alphabetic';
+    if (o.xSaat) { const st = (x1 - x0) > 480 ? 120 : 60; for (let m = Math.ceil(x0 / st) * st; m <= x1; m += st) x.fillText(dkYaz(m), X(m), H - 6); }
+    else { const ax = Math.max(1, Math.round(guzelAdim(x1 - x0, 6))); for (let v = Math.ceil(x0); v <= x1; v += ax) x.fillText(o.xEtiket ? o.xEtiket(v) : String(v), X(v), H - 6); }
+    seriler.forEach(s => {
+      const renk = css(s.renk);
+      if (s.nokta) { x.fillStyle = renk; s.p.forEach(p => { if (isNaN(p.y)) return; x.beginPath(); x.arc(X(p.x), Y(p.y), s.nokta, 0, 7); x.fill(); }); }
+      if (!s.nokta || s.cizgi) {
+        x.strokeStyle = renk; x.lineWidth = 2.2; x.setLineDash(s.kesik ? [6, 4] : []); x.beginPath(); let on = false;
+        s.p.forEach(p => { if (isNaN(p.y)) { on = false; return; } on ? x.lineTo(X(p.x), Y(p.y)) : x.moveTo(X(p.x), Y(p.y)); on = true; });
+        x.stroke(); x.setLineDash([]);
+      }
     });
   }
 

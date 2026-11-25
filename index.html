@@ -223,6 +223,7 @@ nav.tabs button[aria-selected="true"] { color: var(--track); }
         <div class="tog"><div class="t"><b>LoRa</b><span>Ana haberleşme kanalı</span></div><label class="sw"><input type="checkbox" id="tLora" disabled aria-label="LoRa açık/kapalı"><span class="k"></span></label></div>
         <div class="tog"><div class="t"><b>WiFi (ESP-NOW)</b><span>Yedek kanal</span></div><label class="sw"><input type="checkbox" id="tWifi" disabled aria-label="WiFi açık/kapalı"><span class="k"></span></label></div>
         <button class="ghost" id="yeniGun" disabled>Yeni gün başlat</button>
+        <button class="ghost" id="panelTemizle" disabled>Panelleri temizle (simülasyon)</button>
       </div>
       <p class="note">Değişiklik kartın ekranında hemen görünür. İkisini de kapatırsan kartta kırmızı “VERI GELMIYOR” alarmı çıkar.</p>
     </div>
@@ -413,7 +414,7 @@ nav.tabs button[aria-selected="true"] { color: var(--track); }
     btBagli = true; denemeSayisi = 0;
     chip('cBT', 'ok', 'Bağlı');
     $('connectCard').hidden = true; $('kes').hidden = false;
-    ['tLora', 'tWifi', 'yeniGun'].forEach(id => $(id).disabled = !komutOzellik);
+    ['tLora', 'tWifi', 'yeniGun', 'panelTemizle'].forEach(id => $(id).disabled = !komutOzellik);
     uyari('bt', false);
     log('Karta bağlanıldı');
     ekranAcik();
@@ -437,7 +438,7 @@ nav.tabs button[aria-selected="true"] { color: var(--track); }
 
   function koptu() {
     btBagli = false; komutOzellik = null;
-    ['tLora', 'tWifi', 'yeniGun'].forEach(id => $(id).disabled = true);
+    ['tLora', 'tWifi', 'yeniGun', 'panelTemizle'].forEach(id => $(id).disabled = true);
     if (elleKesti || !ayar.oto) {
       chip('cBT', '', 'Bağlı değil');
       $('connectCard').hidden = false; $('kes').hidden = true;
@@ -474,6 +475,7 @@ nav.tabs button[aria-selected="true"] { color: var(--track); }
   let komutBekle = 0;   // kullanıcı anahtara dokununca birkaç saniye karttan gelen durumla ezilmesin
   $('tLora').onchange = e => { komutBekle = Date.now(); komutGonder(e.target.checked ? 'L1' : 'L0'); };
   $('tWifi').onchange = e => { komutBekle = Date.now(); komutGonder(e.target.checked ? 'W1' : 'W0'); };
+  $('panelTemizle').onclick = () => { komutGonder('C'); $('panelTemizle').textContent = 'Temizlendi ✓'; setTimeout(() => { $('panelTemizle').textContent = 'Panelleri temizle (simülasyon)'; }, 2500); };
   let yeniGunOnay = 0;
   $('yeniGun').onclick = () => {
     if (Date.now() - yeniGunOnay < 4000) { komutGonder('N'); yeniGunOnay = 0; $('yeniGun').textContent = 'Yeni gün başlat'; grafik.length = 0; cizGrafik(); return; }
@@ -491,7 +493,7 @@ nav.tabs button[aria-selected="true"] { color: var(--track); }
     const AK = ham[15] !== undefined && ham[15].trim() !== '' ? Number(ham[15]) : NaN;   // anlik kazanc (yoksa bos)
     if (p.length < 8 || p.slice(0, 8).some(isNaN)) { log('Okunamayan veri: ' + satir); return; }
     const d = { PS: p[0], PT: p[1], ES: p[2], ET: p[3], Ta: p[4], H: p[5], UV: p[6], KZ: p[7],
-                Tps: p[8], Tpt: p[9], lora: p[10], wifi: p[11], kanal: p[12], alarm: p[13], dk: p[14], AK: AK };
+                Tps: p[8], Tpt: p[9], lora: p[10], wifi: p[11], kanal: p[12], alarm: p[13], dk: p[14], AK: AK, Em: p[16] };
     goster(d);
     grafik.push({ t: Date.now(), s: d.PS, k: d.PT });
     while (grafik.length > GRAFIK_NOKTA) grafik.shift();
@@ -506,7 +508,7 @@ nav.tabs button[aria-selected="true"] { color: var(--track); }
       yaz('kayitlar', kayitlar);
       if (!$('tab-gecmis').hidden) gecmisGoster();
     }
-    if (ayar.gonder && simdi - sonTS >= TS_ARALIK) { sonTS = simdi; internete({ t: new Date().toISOString(), f: p.slice(0, 7).concat([isNaN(AK) ? '' : AK]), st: simSaatYazi(d.dk) + (isNaN(d.Tps) ? '' : ';Ts=' + d.Tps.toFixed(1) + ';Tt=' + d.Tpt.toFixed(1)) }); }   // Field 8 = anlik kazanc, status = sim. saati + panel sıcaklıkları
+    if (ayar.gonder && simdi - sonTS >= TS_ARALIK) { sonTS = simdi; internete({ t: new Date().toISOString(), f: p.slice(0, 7).concat([isNaN(AK) ? '' : AK]), st: simSaatYazi(d.dk) + (isNaN(d.Tps) ? '' : ';Ts=' + d.Tps.toFixed(1) + ';Tt=' + d.Tpt.toFixed(1)) + (isNaN(d.Em) ? '' : ';Em=' + d.Em.toFixed(2)) }); }   // Field 8 = anlik kazanc, status = sim. saati + panel sıcaklıkları
   }
 
   const uvSeviye = u => u < 3 ? 'Düşük' : u < 6 ? 'Orta' : u < 8 ? 'Yüksek' : u < 11 ? 'Çok yüksek' : 'Aşırı';
