@@ -506,7 +506,7 @@ nav.tabs button[aria-selected="true"] { color: var(--track); }
       yaz('kayitlar', kayitlar);
       if (!$('tab-gecmis').hidden) gecmisGoster();
     }
-    if (ayar.gonder && simdi - sonTS >= TS_ARALIK) { sonTS = simdi; internete({ t: new Date().toISOString(), f: p.slice(0, 7).concat([isNaN(AK) ? '' : AK]), st: simSaatYazi(d.dk) }); }   // Field 8 = anlik kazanc, status = simülasyon saati
+    if (ayar.gonder && simdi - sonTS >= TS_ARALIK) { sonTS = simdi; internete({ t: new Date().toISOString(), f: p.slice(0, 7).concat([isNaN(AK) ? '' : AK]), st: simSaatYazi(d.dk) + (isNaN(d.Tps) ? '' : ';Ts=' + d.Tps.toFixed(1) + ';Tt=' + d.Tpt.toFixed(1)) }); }   // Field 8 = anlik kazanc, status = sim. saati + panel sıcaklıkları
   }
 
   const uvSeviye = u => u < 3 ? 'Düşük' : u < 6 ? 'Orta' : u < 8 ? 'Yüksek' : u < 11 ? 'Çok yüksek' : 'Aşırı';
