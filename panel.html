@@ -155,7 +155,7 @@ footer { color: var(--muted); font-size: .8rem; }
     <div class="card">
       <h2>Son kayıtlar <small id="adet"></small></h2>
       <div class="tbl"><table>
-        <thead><tr><th>Zaman</th><th>Sabit W</th><th>Takip W</th><th>Sabit Wh</th><th>Takip Wh</th><th>Hava °C</th><th>Nem %</th><th>UV</th><th>Anlık kazanç</th></tr></thead>
+        <thead><tr><th>Gerçek zaman</th><th>Sim. saati</th><th>Sabit W</th><th>Takip W</th><th>Sabit Wh</th><th>Takip Wh</th><th>Hava °C</th><th>Nem %</th><th>UV</th><th>Anlık kazanç</th></tr></thead>
         <tbody id="tb"></tbody>
       </table></div>
     </div>
@@ -190,7 +190,7 @@ footer { color: var(--muted); font-size: .8rem; }
 
   let son = null;
   async function yukle() {
-    const url = 'https://api.thingspeak.com/channels/' + kanal + '/feeds.json?results=3000' + (oku ? '&api_key=' + encodeURIComponent(oku) : '');
+    const url = 'https://api.thingspeak.com/channels/' + kanal + '/feeds.json?results=3000&status=true' + (oku ? '&api_key=' + encodeURIComponent(oku) : '');
     try {
       const r = await fetch(url);
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -226,7 +226,8 @@ footer { color: var(--muted); font-size: .8rem; }
   }
 
   function ciz(j) {
-    const f = j.feeds.map(x => ({ t: new Date(x.created_at), v: [1, 2, 3, 4, 5, 6, 7, 8].map(i => x['field' + i] == null || x['field' + i] === '' ? NaN : parseFloat(x['field' + i])) }))
+    const simS = x => { const m = /(\d{1,2}:\d{2})/.exec(x || ''); return m ? m[1] : '–'; };
+    const f = j.feeds.map(x => ({ t: new Date(x.created_at), sim: simS(x.status), v: [1, 2, 3, 4, 5, 6, 7, 8].map(i => x['field' + i] == null || x['field' + i] === '' ? NaN : parseFloat(x['field' + i])) }))
       .filter(x => !isNaN(x.v[0]));
     $('foot').textContent = (j.channel && j.channel.name ? j.channel.name + ' · ' : '') + 'Kanal ' + kanal + ' · ThingSpeak · ' + f.length + ' kayıt incelendi';
     if (!f.length) { $('live').className = 'live'; $('liveT').textContent = 'Henüz veri yok'; return; }
@@ -241,7 +242,7 @@ footer { color: var(--muted); font-size: .8rem; }
     $('gV').style.color = isNaN(kz) || kz >= 0 ? css('--good') : css('--bad');
     $('gT').innerHTML = isNaN(kz) ? 'Gün yeni başladı; karşılaştırma için enerji birikmesi bekleniyor.'
       : 'Takip paneli bugün sabit panele göre <b>' + tr(Math.abs(kz), 1) + '% ' + (kz >= 0 ? 'daha fazla' : 'daha az') + '</b> enerji üretti: <b>' + tr(v[3], 1) + ' Wh</b> ile <b>' + tr(v[2], 1) + ' Wh</b>.';
-    $('gSaat').textContent = s.t.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    $('gSaat').textContent = s.t.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) + (s.sim !== '–' ? ' · sim. ' + s.sim : '');
     ibre(v[7]);
     $('mPS').textContent = tr(v[0], 1) + ' W'; $('mPT').textContent = tr(v[1], 1) + ' W';
     const fp = v[1] - v[0];
@@ -274,8 +275,8 @@ footer { color: var(--muted); font-size: .8rem; }
     f.slice(-15).reverse().forEach(x => {
       const row = document.createElement('tr');
       [x.t.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-       tr(x.v[0], 2), tr(x.v[1], 2), tr(x.v[2], 1), tr(x.v[3], 1), tr(x.v[4], 1), tr(x.v[5], 0), tr(x.v[6], 1), isNaN(x.v[7]) ? '–' : (x.v[7] >= 0 ? '+' : '−') + tr(Math.abs(x.v[7]), 0) + '%']
-        .forEach((t, i) => { const td = document.createElement('td'); td.textContent = t; if (i === 1 || i === 3) td.style.color = css('--fixed'); if (i === 2 || i === 4) td.style.color = css('--track'); row.appendChild(td); });
+       x.sim, tr(x.v[0], 2), tr(x.v[1], 2), tr(x.v[2], 1), tr(x.v[3], 1), tr(x.v[4], 1), tr(x.v[5], 0), tr(x.v[6], 1), isNaN(x.v[7]) ? '–' : (x.v[7] >= 0 ? '+' : '−') + tr(Math.abs(x.v[7]), 0) + '%']
+        .forEach((t, i) => { const td = document.createElement('td'); td.textContent = t; if (i === 1) td.style.color = css('--muted'); if (i === 2 || i === 4) td.style.color = css('--fixed'); if (i === 3 || i === 5) td.style.color = css('--track'); row.appendChild(td); });
       tb.appendChild(row);
     });
   }

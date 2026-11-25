@@ -506,7 +506,7 @@ nav.tabs button[aria-selected="true"] { color: var(--track); }
       yaz('kayitlar', kayitlar);
       if (!$('tab-gecmis').hidden) gecmisGoster();
     }
-    if (ayar.gonder && simdi - sonTS >= TS_ARALIK) { sonTS = simdi; internete({ t: new Date().toISOString(), f: p.slice(0, 7).concat([isNaN(AK) ? '' : AK]) }); }   // Field 8 = anlik kazanc
+    if (ayar.gonder && simdi - sonTS >= TS_ARALIK) { sonTS = simdi; internete({ t: new Date().toISOString(), f: p.slice(0, 7).concat([isNaN(AK) ? '' : AK]), st: simSaatYazi(d.dk) }); }   // Field 8 = anlik kazanc, status = simülasyon saati
   }
 
   const uvSeviye = u => u < 3 ? 'Düşük' : u < 6 ? 'Orta' : u < 8 ? 'Yüksek' : u < 11 ? 'Çok yüksek' : 'Aşırı';
@@ -549,8 +549,14 @@ nav.tabs button[aria-selected="true"] { color: var(--track); }
   }
 
   // ---------- ThingSpeak ----------
+  function simSaatYazi(dk) {
+    if (isNaN(dk)) return '';
+    const m = Math.floor(dk);
+    return 'sim ' + String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  }
   function tsUrl(k) {
     let q = 'api_key=' + encodeURIComponent(ayar.anahtar) + '&' + k.f.map((v, i) => v === '' || v === null ? '' : 'field' + (i + 1) + '=' + encodeURIComponent(v)).filter(Boolean).join('&');
+    if (k.st) q += '&status=' + encodeURIComponent(k.st);
     if (k.eski) q += '&created_at=' + encodeURIComponent(k.t);
     return 'https://api.thingspeak.com/update?' + q;
   }
