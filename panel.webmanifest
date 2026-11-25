@@ -1,0 +1,16 @@
+{
+  "name": "Güneş Paneli İzleme",
+  "short_name": "Güneş Paneli",
+  "description": "Sabit ve güneş takipli panel karşılaştırması: canlı veriler",
+  "lang": "tr",
+  "start_url": "panel.html?kanal=3595625",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B1220",
+  "theme_color": "#0B1220",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

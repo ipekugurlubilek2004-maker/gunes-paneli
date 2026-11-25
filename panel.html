@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Güneş Paneli Karşılaştırma Paneli</title>
+<!-- Ana ekrana eklenince tam ekran uygulama gibi açılsın -->
+<link rel="manifest" href="panel.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Güneş Paneli">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#F4F3EE" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B1220" media="(prefers-color-scheme: dark)">
 <style>
 /* Hocanın panel sayfası: kazanç (günlük + anlık ibre), güç, enerji sütunları, UV analizi, çevre grafikleri, son kayıtlar. */
 :root {
@@ -20,8 +30,28 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.45;
-  padding: 24px max(16px, env(safe-area-inset-right)) 40px max(16px, env(safe-area-inset-left)); }
-.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 18px; }
+  padding: max(24px, calc(env(safe-area-inset-top) + 12px)) max(16px, env(safe-area-inset-right)) max(40px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+/* telefon ekranı */
+@media (max-width: 600px) {
+  body { font-size: 14px; }
+  .wrap { gap: 12px; }
+  header h1 { font-size: 1.35rem; }
+  header p { font-size: .85rem; }
+  .card { padding: 14px; border-radius: 14px; }
+  .gain .v { font-size: 2.8rem; }
+  .cb { height: 190px; }
+  .cb.kucuk { height: 110px; }
+  .m .v { font-size: 1.35rem; }
+  table { font-size: .78rem; }
+  th, td { padding: 6px 7px; }
+}
+/* ana ekrana ekleme ipucu (iPhone Safari) */
+.ipucu { display: flex; gap: 10px; align-items: center; background: var(--surface); border: 1px solid var(--accent); border-radius: 14px; padding: 10px 12px; font-size: .85rem; }
+.ipucu img { width: 36px; height: 36px; border-radius: 9px; flex: none; }
+.ipucu span { flex: 1; }
+.ipucu button { font: inherit; font-weight: 600; border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 6px; }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); width: 100%; }
+.wrap > * { min-width: 0; }
 header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; }
 header .eb { font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
 header h1 { margin: 2px 0 4px; font-size: 1.9rem; line-height: 1.15; }
@@ -81,6 +111,12 @@ footer { color: var(--muted); font-size: .8rem; }
     </div>
     <span class="live" id="live"><i></i><span id="liveT">Yükleniyor…</span></span>
   </header>
+
+  <div class="ipucu" id="ipucu" hidden>
+    <img src="apple-touch-icon.png" alt="">
+    <span><b>Uygulama olarak ekle:</b> alttaki Paylaş düğmesine dokun, sonra <b>Ana Ekrana Ekle</b>'yi seç.</span>
+    <button id="ipucuKapat" aria-label="Kapat">✕</button>
+  </div>
 
   <div class="card setup" id="setup" hidden>
     <h2>Kanal seç</h2>
@@ -169,7 +205,16 @@ footer { color: var(--muted); font-size: .8rem; }
   const $ = id => document.getElementById(id);
   const tr = (v, d) => (v == null || isNaN(v)) ? '–' : Number(v).toFixed(d).replace('.', ',');
   const prm = new URLSearchParams(location.search);
-  let kanal = prm.get('kanal') || '', oku = prm.get('anahtar') || '';
+  const sakla = { al(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, yaz(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+  // Ana ekrandan linksiz açılırsa son kullanılan kanalı hatırla
+  let kanal = prm.get('kanal') || sakla.al('panelKanal') || '', oku = prm.get('anahtar') || sakla.al('panelOku') || '';
+  if (/^\d+$/.test(kanal)) { sakla.yaz('panelKanal', kanal); if (oku) sakla.yaz('panelOku', oku); }
+
+  // iPhone Safari'de, henüz ana ekrana eklenmemişse ipucu göster
+  const tamEkran = window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  const iosSafari = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent);
+  if (iosSafari && !tamEkran && sakla.al('ipucuKapali') !== '1') $('ipucu').hidden = false;
+  $('ipucuKapat').onclick = () => { $('ipucu').hidden = true; sakla.yaz('ipucuKapali', '1'); };
   const BOSLUK = 120000;          // 2 dakikadan uzun veri boşluğunda çizgi kesilir
   const PENCERE = 12 * 3600000;   // zaman grafikleri: son 12 saat
 
