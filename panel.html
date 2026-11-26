@@ -521,13 +521,23 @@ footer { color: var(--muted); font-size: .8rem; }
     const b = EGIM * DR, cosI = cosZ * Math.cos(b) + Math.sin(Z) * Math.sin(b) * Math.cos((az - YON) * DR);
     return { yuk: 90 - Z / DR, az, gel: Math.acos(Math.max(-1, Math.min(1, cosI))) / DR };
   }
+  // Katsayılar PVGIS 5.3 (Çağış) aylık ışınımına uydurularak seçildi (kartla aynı)
+  const GECIRGENLIK = 0.66, DIF_ACIK = 0.14, DIF_BULUT = 0.15, BULUT_KESME = 0.95, ZEMIN = 0.20, IAM_B0 = 0.05;
   function isinim(g, bulut) {
     if (g.yuk <= 0.5) return { yatay: 0, sabit: 0, takip: 0 };
-    const Z = 90 - g.yuk, am = 1 / (Math.cos(Z * DR) + 0.50572 * Math.pow(96.07995 - Z, -1.6364));
-    const acik = 1353 * Math.pow(0.7, Math.pow(am, 0.678)), dni = acik * (1 - 0.85 * bulut), dif = acik * (0.10 + 0.20 * bulut);
-    const cosI = Math.cos(g.gel * DR);
-    return { yatay: dni * Math.cos(Z * DR) + dif, sabit: dni * Math.max(0, cosI) + dif * (1 + Math.cos(EGIM * DR)) / 2, takip: dni + dif };
+    const Z = 90 - g.yuk, cosZ = Math.cos(Z * DR), am = 1 / (cosZ + 0.50572 * Math.pow(96.07995 - Z, -1.6364));
+    const acik = 1353 * Math.pow(GECIRGENLIK, Math.pow(am, 0.678)), dni = acik * (1 - BULUT_KESME * bulut), dif = acik * (DIF_ACIK + DIF_BULUT * bulut);
+    const yatay = dni * cosZ + dif, cosI = Math.cos(g.gel * DR), cb = Math.cos(EGIM * DR);
+    const iam = cosI > 0.05 ? Math.max(0, 1 - IAM_B0 * (1 / cosI - 1)) : 0;
+    return {
+      yatay,
+      sabit: dni * Math.max(0, cosI) * iam + dif * (1 + cb) / 2 + yatay * ZEMIN * (1 - cb) / 2,
+      takip: dni + dif * (1 + cosZ) / 2 + yatay * ZEMIN * (1 - cosZ) / 2
+    };
   }
+  // Çağış için PVGIS 5.3 aylık ortalamaları (1 kWp, %14 kayıp): sabit 30° güney / çift eksen, kWh/gün
+  const PVGIS_SABIT = [2.17, 2.69, 3.45, 4.29, 4.70, 5.08, 5.57, 5.41, 4.80, 3.72, 2.90, 2.19];
+  const PVGIS_TAKIP = [2.77, 3.35, 4.29, 5.51, 6.32, 7.25, 8.11, 7.51, 6.25, 4.78, 3.78, 2.88];
   function dogusBatis(N) {
     let d = NaN, b = NaN;
     for (let dk = 180; dk < 1320; dk += 2) { if (gunesKonum(N, dk).yuk > -0.83) { if (isNaN(d)) d = dk; b = dk; } }
@@ -573,7 +583,7 @@ footer { color: var(--muted); font-size: .8rem; }
       const prS = [], prT = [];
       d.forEach(x => {
         const e = beklenen(x); if (!e) return;
-        const tfS = isNaN(x.ts) ? 1 : 1 - 0.004 * (x.ts - 25), tfT = isNaN(x.tt) ? 1 : 1 - 0.004 * (x.tt - 25);
+        const tfS = isNaN(x.ts) ? 1 : 1 - 0.0038 * (x.ts - 25), tfT = isNaN(x.tt) ? 1 : 1 - 0.0038 * (x.tt - 25);
         if (e.Gs > 150) prS.push(x.v[0] / (PANEL_W * e.Gs / 1000 * tfS) * 100);
         if (e.Gt > 150) prT.push(x.v[1] / (PANEL_W * e.Gt / 1000 * tfT) * 100);
       });
@@ -638,7 +648,13 @@ footer { color: var(--muted); font-size: .8rem; }
     const olc = gun.kayit.filter(x => !isNaN(x.dk) && x.v[7] > 0 && x.v[0] >= 2).map(x => ({ x: x.dk, y: Math.min(x.v[7], 150) }));
     xyGrafik($('cTeori'), [{ p: teo, renk: '--muted', kesik: true }, { p: olc, renk: '--track', nokta: 2.6 }], { xSaat: true, yBirim: '%', yMin: 0 });
     $('teoriNot').innerHTML = 'Bugün için teorik günlük kazanç <b>+%' + tr(gun.teorik, 1) + '</b>, ölçülen <b>' + (isNaN(gun.kz) ? '–' : (gun.kz >= 0 ? '+%' : '−%') + tr(Math.abs(gun.kz), 1)) +
-      '</b>. Fark; bulut, panel sıcaklığı, kirlenme ve takip hassasiyetinden kaynaklanır. Teorik değer açık havada güneşin konumundan hesaplanır.';
+      '</b>. Fark; bulut, panel sıcaklığı, kirlenme ve takip hassasiyetinden kaynaklanır. Teorik değer açık havada güneşin konumundan hesaplanır.' +
+      (() => {
+        const ay = new Date(new Date().getFullYear(), 0, N).getMonth(), adi = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'][ay];
+        const s = PVGIS_SABIT[ay] * PANEL_W, t = PVGIS_TAKIP[ay] * PANEL_W;
+        return '<br><b>Gerçek verilerle karşılaştırma (Çağış):</b> PVGIS uydu verisine göre ' + adi + ' ayında ' + PANEL_W + ' W panel ortalama günde sabit <b>' + tr(s, 0) +
+          ' Wh</b>, takip <b>' + tr(t, 0) + ' Wh</b> üretir (kazanç %' + tr((t / s - 1) * 100, 0) + '; yıllık %34). Aynı kampüste yapılan ölçümlü çalışmada (Beyoğlu, 2011) çift eksen takip <b>%39</b> fazla üretmiştir.';
+      })();
   }
 
   // Kirlenme: günlük performans oranlarının seyri
